@@ -1,0 +1,21 @@
+{
+  "localPaths": [
+    "~/.codex/skills",
+    "~/.agents/skills",
+    "/Users/totem/Desktop/Code/Skills"
+  ],
+  "gitSources": [
+    "https://github.com/vercel-labs/skills"
+  ],
+  "trustedOwners": [
+    "vercel-labs",
+    "anthropics",
+    "microsoft",
+    "openai"
+  ],
+  "autoInstall": {
+    "targetAgent": "codex",
+    "minimumScore": 70,
+    "minimumInstallsForPublic": 1000
+  }
+}

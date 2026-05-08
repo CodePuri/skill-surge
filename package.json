@@ -1,0 +1,26 @@
+{
+  "name": "skill-aggregator",
+  "version": "0.1.0",
+  "description": "Aggregate, rank, and install relevant agent skills for Codex tasks.",
+  "type": "module",
+  "bin": {
+    "skill-aggregator": "./dist/cli.js"
+  },
+  "scripts": {
+    "start": "node dist/cli.js",
+    "check": "node --check dist/cli.js",
+    "build": "tsc -p tsconfig.json"
+  },
+  "files": [
+    "dist",
+    "config",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  },
+  "license": "MIT"
+}
