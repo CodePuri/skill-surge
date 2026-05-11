@@ -1,40 +1,22 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { configPath, readJson } from './cache.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '..', '..');
-const DEFAULT_CONFIG_PATH = path.join(REPO_ROOT, 'config', 'sources.json');
-const USER_CONFIG_PATH = path.join(os.homedir(), '.config', 'skill-surge', 'sources.json');
-function readJson(filePath, fallback) {
-    try {
-        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    }
-    catch {
-        return fallback;
-    }
-}
+const DEFAULT_CONFIG_PATH = path.join(__dirname, '..', '..', 'config', 'sources.json');
 export function loadConfig() {
     const base = readJson(DEFAULT_CONFIG_PATH, {});
-    const user = readJson(USER_CONFIG_PATH, {});
+    const user = readJson(configPath(), {});
     return {
-        localPaths: [...(base.localPaths || []), ...(user.localPaths || [])],
-        gitSources: [...(base.gitSources || []), ...(user.gitSources || [])],
+        preferredAgents: [...(base.preferredAgents || []), ...(user.preferredAgents || [])],
+        installMode: user.installMode || base.installMode || 'copy',
+        scope: user.scope || base.scope || 'both',
         trustedOwners: [...new Set([...(base.trustedOwners || []), ...(user.trustedOwners || [])])],
-        remoteRegistries: [...(base.remoteRegistries || []), ...(user.remoteRegistries || [])],
-        autoInstall: {
-            ...(base.autoInstall || {}),
-            ...(user.autoInstall || {}),
-        },
-        preSeed: {
-            ...(base.preSeed || { enabled: true }),
-            ...(user.preSeed || {}),
-        },
+        customSources: [...(base.customSources || []), ...(user.customSources || [])],
     };
 }
-export function getBundlePath() {
-    return path.join(REPO_ROOT, 'skills');
-}
-export function getReposRoot() {
-    return [REPO_ROOT];
+export function saveConfig(config) {
+    const p = configPath();
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(config, null, 2) + '\n');
 }

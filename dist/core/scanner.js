@@ -1,45 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
-import { getBundlePath } from './config.js';
-function sha(value) {
-    return crypto.createHash('sha1').update(value).digest('hex');
-}
-function expandHome(value) {
-    if (value === '~')
+function expandHome(p) {
+    if (p === '~')
         return os.homedir();
-    if (value.startsWith('~/'))
-        return path.join(os.homedir(), value.slice(2));
-    return value;
+    if (p.startsWith('~/'))
+        return path.join(os.homedir(), p.slice(2));
+    if (p.startsWith('./'))
+        return path.join(process.cwd(), p.slice(2));
+    return p;
 }
-function parseFrontmatter(content) {
-    if (!content.startsWith('---'))
-        return null;
-    const end = content.indexOf('\n---', 3);
-    if (end === -1)
-        return null;
-    const lines = content.slice(3, end).split(/\r?\n/);
-    const result = {};
-    for (const line of lines) {
-        const match = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-        if (!match)
-            continue;
-        let value = match[2].trim();
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-        }
-        result[match[1]] = value;
-    }
-    if (!result.name || !result.description)
-        return null;
-    return result;
-}
-function findSkillFiles(root, maxDepth = 4) {
-    const resolvedRoot = expandHome(root);
+function findSkillDirs(root, maxDepth = 3) {
+    const resolved = expandHome(root);
+    if (!fs.existsSync(resolved))
+        return [];
     const found = [];
-    if (!fs.existsSync(resolvedRoot))
-        return found;
     function visit(dir, depth) {
         if (depth > maxDepth)
             return;
@@ -50,69 +25,60 @@ function findSkillFiles(root, maxDepth = 4) {
         catch {
             return;
         }
-        for (const entry of entries) {
-            const full = path.join(dir, entry.name);
-            if (entry.isFile() && entry.name === 'SKILL.md') {
-                found.push(full);
-            }
-            else if (entry.isDirectory() && !['.git', 'node_modules', 'dist', '.cache', '__pycache__'].includes(entry.name)) {
-                visit(full, depth + 1);
+        for (const e of entries) {
+            if (e.isDirectory() && !['node_modules', '.git', 'dist', '.cache'].includes(e.name)) {
+                const full = path.join(dir, e.name);
+                const skillMd = path.join(full, 'SKILL.md');
+                if (fs.existsSync(skillMd))
+                    found.push(full);
+                else
+                    visit(full, depth + 1);
             }
         }
     }
-    visit(resolvedRoot, 0);
+    visit(resolved, 0);
     return found;
 }
-function candidateFromSkill(filePath, sourceKind) {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const metadata = parseFrontmatter(content);
-    if (!metadata)
-        return null;
-    const sourceKey = path.dirname(filePath);
-    const dirName = path.basename(sourceKey);
-    return {
-        id: sha(`${sourceKind}:${sourceKey}`).slice(0, 12),
-        name: metadata.name || dirName,
-        description: metadata.description || 'No description.',
-        sourceKind,
-        source: sourceKey,
-        url: metadata.url || null,
-        installCount: null,
-        installCommand: null,
-        hash: sha(content),
-        lastSeenAt: new Date().toISOString(),
-        score: 0,
-        canAutoInstall: false,
-        reason: sourceKind === 'bundled' ? 'Pre-bundled skill shipped with skill-surge.' : 'Installed local skill.',
-        category: metadata.category || undefined,
-    };
-}
-export function scanBundleSkills(config) {
-    const bundlePath = getBundlePath();
-    const seen = new Set();
-    const candidates = [];
-    if (config.preSeed?.enabled !== false) {
-        for (const filePath of findSkillFiles(bundlePath, 5)) {
-            const candidate = candidateFromSkill(filePath, 'bundled');
-            if (!candidate || seen.has(candidate.id))
-                continue;
-            seen.add(candidate.id);
-            candidates.push(candidate);
+function parseSkillDir(dirPath) {
+    const dirName = path.basename(dirPath);
+    const skillMd = path.join(dirPath, 'SKILL.md');
+    let name = dirName;
+    try {
+        const content = fs.readFileSync(skillMd, 'utf8');
+        if (content.startsWith('---')) {
+            const end = content.indexOf('\n---', 3);
+            if (end > 0) {
+                for (const line of content.slice(3, end).split('\n')) {
+                    const m = line.match(/^name:\s*(.+)$/);
+                    if (m) {
+                        name = m[1].trim();
+                        break;
+                    }
+                }
+            }
         }
     }
-    return candidates;
+    catch { /* use dirName */ }
+    return { name, skillMd };
 }
-export function scanLocalCandidates(config) {
-    const seen = new Set();
-    const candidates = [];
-    for (const root of config.localPaths || []) {
-        for (const filePath of findSkillFiles(root)) {
-            const candidate = candidateFromSkill(filePath, 'local');
-            if (!candidate || seen.has(candidate.id))
-                continue;
-            seen.add(candidate.id);
-            candidates.push(candidate);
+export function scanLocalSkills(agentPaths) {
+    const results = [];
+    for (const ap of agentPaths) {
+        const resolved = expandHome(ap);
+        if (!fs.existsSync(resolved))
+            continue;
+        for (const skillDir of findSkillDirs(resolved, 3)) {
+            const { name, skillMd } = parseSkillDir(skillDir);
+            results.push({ name, path: skillMd, agentPath: ap });
         }
     }
-    return candidates;
+    return results;
+}
+export function getSkillContent(skillMdPath) {
+    try {
+        return fs.readFileSync(skillMdPath, 'utf8');
+    }
+    catch {
+        return '';
+    }
 }

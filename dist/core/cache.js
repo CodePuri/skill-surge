@@ -1,61 +1,50 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-const DEFAULT_CACHE_PATH = path.join(os.homedir(), '.cache', 'skill-surge', 'index.json');
-const FALLBACK_CACHE_PATH = path.join(os.tmpdir(), 'skill-surge', 'index.json');
-function cachePath() {
-    return process.env.AUTO_SKILLS_CACHE || DEFAULT_CACHE_PATH;
+export function cachePath() {
+    const home = os.homedir();
+    const custom = process.env.SKILL_SURGE_CACHE;
+    if (custom)
+        return custom;
+    return path.join(home, '.cache', 'skill-surge', 'index.json');
 }
-function emptyCache() {
-    return { version: 1, generatedAt: null, candidates: [] };
+export function configPath() {
+    return path.join(os.homedir(), '.config', 'skill-surge', 'sources.json');
+}
+export function ensureDir(filePath) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+}
+export function readJson(filePath, fallback) {
+    try {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+    catch {
+        return fallback;
+    }
+}
+export function writeJson(filePath, data) {
+    ensureDir(filePath);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
 }
 export function loadCache() {
-    const targets = [cachePath(), FALLBACK_CACHE_PATH];
-    for (const target of targets) {
-        try {
-            const data = JSON.parse(fs.readFileSync(target, 'utf8'));
-            if (data && typeof data === 'object') {
-                return {
-                    version: data.version || 1,
-                    generatedAt: data.generatedAt || null,
-                    candidates: Array.isArray(data.candidates) ? data.candidates : [],
-                };
-            }
-        }
-        catch {
-            continue;
-        }
+    const p = cachePath();
+    if (fs.existsSync(p)) {
+        const data = readJson(p, null);
+        if (data && typeof data === 'object' && data.skills)
+            return data;
     }
-    return emptyCache();
+    return { version: 1, generatedAt: null, skills: {} };
 }
-export function writeCache(cache) {
-    const targets = [cachePath(), FALLBACK_CACHE_PATH];
-    let lastError = null;
-    for (const target of targets) {
-        try {
-            fs.mkdirSync(path.dirname(target), { recursive: true });
-            fs.writeFileSync(target, JSON.stringify(cache, null, 2) + '\n');
-            return target;
-        }
-        catch (error) {
-            lastError = error;
-        }
-    }
-    throw lastError;
+export function saveCache(cache) {
+    const p = cachePath();
+    ensureDir(p);
+    writeJson(p, cache);
 }
 export function clearCache() {
-    const targets = [cachePath(), FALLBACK_CACHE_PATH];
-    let any = false;
-    for (const target of targets) {
-        try {
-            if (fs.existsSync(target)) {
-                fs.unlinkSync(target);
-                any = true;
-            }
-        }
-        catch {
-            // ignore
-        }
+    const p = cachePath();
+    if (fs.existsSync(p)) {
+        fs.unlinkSync(p);
+        return true;
     }
-    return any;
+    return false;
 }

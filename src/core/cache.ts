@@ -1,65 +1,61 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Cache } from '../types.js';
 
-const DEFAULT_CACHE_PATH = path.join(os.homedir(), '.cache', 'skill-surge', 'index.json');
-const FALLBACK_CACHE_PATH = path.join(os.tmpdir(), 'skill-surge', 'index.json');
-
-function cachePath(): string {
-  return process.env.AUTO_SKILLS_CACHE || DEFAULT_CACHE_PATH;
+export function cachePath(): string {
+  const home = os.homedir();
+  const custom = process.env.SKILL_SURGE_CACHE;
+  if (custom) return custom;
+  return path.join(home, '.cache', 'skill-surge', 'index.json');
 }
 
-function emptyCache(): Cache {
-  return { version: 1, generatedAt: null, candidates: [] };
+export function configPath(): string {
+  return path.join(os.homedir(), '.config', 'skill-surge', 'sources.json');
 }
 
-export function loadCache(): Cache {
-  const targets = [cachePath(), FALLBACK_CACHE_PATH];
-  for (const target of targets) {
-    try {
-      const data = JSON.parse(fs.readFileSync(target, 'utf8'));
-      if (data && typeof data === 'object') {
-        return {
-          version: data.version || 1,
-          generatedAt: data.generatedAt || null,
-          candidates: Array.isArray(data.candidates) ? data.candidates : [],
-        };
-      }
-    } catch {
-      continue;
-    }
+export function ensureDir(filePath: string): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+}
+
+export function readJson<T>(filePath: string, fallback: T): T {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return fallback;
   }
-  return emptyCache();
 }
 
-export function writeCache(cache: Cache): string {
-  const targets = [cachePath(), FALLBACK_CACHE_PATH];
-  let lastError: unknown = null;
-  for (const target of targets) {
-    try {
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, JSON.stringify(cache, null, 2) + '\n');
-      return target;
-    } catch (error) {
-      lastError = error;
-    }
+export function writeJson(filePath: string, data: unknown): void {
+  ensureDir(filePath);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
+}
+
+export interface CacheData {
+  version: number;
+  generatedAt: string | null;
+  skills: Record<string, { installedAt: string; agents: string[] }>;
+}
+
+export function loadCache(): CacheData {
+  const p = cachePath();
+  if (fs.existsSync(p)) {
+    const data = readJson<CacheData | null>(p, null);
+    if (data && typeof data === 'object' && data.skills) return data;
   }
-  throw lastError;
+  return { version: 1, generatedAt: null, skills: {} };
+}
+
+export function saveCache(cache: CacheData): void {
+  const p = cachePath();
+  ensureDir(p);
+  writeJson(p, cache);
 }
 
 export function clearCache(): boolean {
-  const targets = [cachePath(), FALLBACK_CACHE_PATH];
-  let any = false;
-  for (const target of targets) {
-    try {
-      if (fs.existsSync(target)) {
-        fs.unlinkSync(target);
-        any = true;
-      }
-    } catch {
-      // ignore
-    }
+  const p = cachePath();
+  if (fs.existsSync(p)) {
+    fs.unlinkSync(p);
+    return true;
   }
-  return any;
+  return false;
 }

@@ -1,47 +1,119 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import type { Candidate } from '../types.js';
+import type { Agent, InstallResult } from '../types.js';
+import { resolveAgentPath } from './agent.js';
+import { loadCache, saveCache } from './cache.js';
+import { ALL_SKILLS } from './catalog.js';
 
-export function validateInstallCommand(candidate: Candidate): { valid: boolean; reason?: string } {
-  if (!Array.isArray(candidate.installCommand)) {
-    return { valid: false, reason: 'No install command available.' };
+export function installSkillToAgents(
+  skillName: string,
+  agents: Agent[],
+  scope: 'global' | 'project' | 'both',
+  options: { dryRun?: boolean; installMode?: 'copy' | 'symlink' } = {},
+): InstallResult[] {
+  const results: InstallResult[] = [];
+  const skill = ALL_SKILLS.find(s => s.name === skillName);
+  if (!skill) {
+    return [{ skill: skillName, agent: 'all', success: false, error: 'Skill not found in catalog' }];
   }
-  const cmd = candidate.installCommand;
-  const validShape = cmd.length >= 9
-    && cmd[0] === 'npx'
-    && cmd[1] === 'skills'
-    && cmd[2] === 'add'
-    && cmd.includes('-g')
-    && cmd.includes('-a')
-    && cmd.includes('codex')
-    && cmd.includes('-y');
 
-  if (!validShape) {
-    return { valid: false, reason: 'Install command has unexpected shape. Must use npx skills add ... -g -a codex -y' };
+  const scopes: ('global' | 'project')[] = scope === 'both' ? ['global', 'project'] : [scope];
+
+  for (const agent of agents) {
+    for (const s of scopes) {
+      const targetDir = resolveAgentPath(agent, s);
+      const targetFile = path.join(targetDir, `${skillName}.md`);
+
+      results.push({
+        skill: skillName,
+        agent: `${agent.name} (${s})`,
+        success: true,
+      });
+
+      if (options.dryRun) continue;
+
+      try {
+        fs.mkdirSync(targetDir, { recursive: true });
+        if (skill.source === 'top-repo' && skill.repo) {
+          const result = spawnSync(
+            'npx', ['skills', 'add', skill.repo, '--skill', skillName, '-g'],
+            { encoding: 'utf8', timeout: 60_000, shell: false }
+          );
+          if (result.status !== 0) {
+            results.push({ skill: skillName, agent: `${agent.name} (${s})`, success: false, error: result.stderr || 'npx skills add failed' });
+          }
+        } else {
+          const src = getOriginalSkillPath(skillName);
+          if (!src) {
+            results.push({ skill: skillName, agent: `${agent.name} (${s})`, success: false, error: 'Original skill source not found' });
+            continue;
+          }
+          if (options.installMode === 'symlink') {
+            fs.symlinkSync(src, targetFile);
+          } else {
+            fs.copyFileSync(src, targetFile);
+          }
+        }
+
+        const cache = loadCache();
+        if (!cache.skills[skillName]) {
+          cache.skills[skillName] = { installedAt: new Date().toISOString(), agents: [] };
+        }
+        if (!cache.skills[skillName].agents.includes(agent.slug)) {
+          cache.skills[skillName].agents.push(agent.slug);
+        }
+        saveCache(cache);
+      } catch (err) {
+        results.push({ skill: skillName, agent: `${agent.name} (${s})`, success: false, error: String(err) });
+      }
+    }
   }
-  return { valid: true };
+
+  return results;
 }
 
-export function installCandidate(candidate: Candidate, dryRun: boolean): { success: boolean; code: number; error?: string } {
-  const validation = validateInstallCommand(candidate);
-  if (!validation.valid) {
-    return { success: false, code: 3, error: validation.reason };
+export function installTopRepoSkills(
+  agents: Agent[],
+  scope: 'global' | 'project' | 'both',
+): { repo: string; skills: string[]; results: InstallResult[] }[] {
+  const results: { repo: string; skills: string[]; results: InstallResult[] }[] = [];
+  const byRepo = new Map<string, string[]>();
+
+  for (const skill of ALL_SKILLS) {
+    if (skill.source === 'top-repo' && skill.repo) {
+      if (!byRepo.has(skill.repo)) byRepo.set(skill.repo, []);
+      byRepo.get(skill.repo)!.push(skill.name);
+    }
   }
 
-  console.log(`  ${candidate.installCommand!.join(' ')}`);
-
-  if (dryRun) {
-    return { success: true, code: 0 };
+  for (const [repo, skillNames] of byRepo) {
+    const repoResults: InstallResult[] = [];
+    const cmd = ['npx', 'skills', 'add', repo, '-g', '-y'];
+    const r = spawnSync(cmd[0], cmd.slice(1), { encoding: 'utf8', timeout: 120_000, shell: false });
+    if (r.status === 0) {
+      for (const name of skillNames) {
+        for (const agent of agents) {
+          repoResults.push({ skill: name, agent: agent.name, success: true });
+        }
+      }
+    } else {
+      for (const name of skillNames) {
+        repoResults.push({ skill: name, agent: 'all', success: false, error: r.stderr || 'install failed' });
+      }
+    }
+    results.push({ repo, skills: skillNames, results: repoResults });
   }
 
-  const result = spawnSync(candidate.installCommand![0], candidate.installCommand!.slice(1), {
-    stdio: 'inherit',
-    shell: false,
-  });
+  return results;
+}
 
-  const code = result.status ?? 1;
-  return {
-    success: code === 0,
-    code,
-    error: code !== 0 ? 'Install command failed.' : undefined,
-  };
+function getOriginalSkillPath(skillName: string): string | null {
+  const home = os.homedir();
+  const skillSurgeRoot = path.join(home, 'Desktop', 'Code', 'auto-skills');
+  const originalDir = path.join(skillSurgeRoot, 'skills', 'original', skillName);
+  const skillMd = path.join(originalDir, 'SKILL.md');
+  if (fs.existsSync(skillMd)) return skillMd;
+  return null;
 }

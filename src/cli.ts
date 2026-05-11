@@ -1,552 +1,491 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import ora from 'ora';
-import gradient from 'gradient-string';
-import type { Candidate } from './types.js';
-import { loadConfig, getBundlePath } from './core/config.js';
-import { loadCache, writeCache, clearCache } from './core/cache.js';
-import { scanBundleSkills, scanLocalCandidates } from './core/scanner.js';
-import {
-  scoreCandidate, dedupeByName, mergeCandidates,
-  rerankWithExternalCommand, isTrivialTask,
-} from './core/ranker.js';
-import { runSkillsFind } from './core/registrar.js';
-import { installCandidate } from './core/installer.js';
-import { renderSplash, renderHelp, printCandidates } from './ui/splash.js';
-import { infoBox, successBox, warningBox, errorBox, dashboardBox } from './ui/box.js';
-import { renderCandidateTable } from './ui/table.js';
+import type { Agent, ScoredCandidate, ScanResult } from './types.js';
+import { detectAgents, detectInstalledAgents, resolveAgentPath } from './core/agent.js';
+import { loadConfig } from './core/config.js';
+import { loadCache, saveCache, configPath } from './core/cache.js';
+import { auditProject } from './core/auditor.js';
+import { runSkillsFind, rankSkillsForTask } from './core/registrar.js';
+import { installSkillToAgents, installTopRepoSkills } from './core/installer.js';
+import { isTrivialTask } from './core/ranker.js';
+import { ALL_SKILLS, getSkillByName } from './core/catalog.js';
+import { T, box, divider, header } from './ui/terminal.js';
+import { ask, confirm, select } from './ui/prompt.js';
 
-const VERSION = '1.0.1';
+const VERSION = '2.0.0';
 
-interface Flags {
-  [key: string]: boolean | string | string[] | undefined;
-  json?: boolean;
-  'dry-run'?: boolean;
-  network?: boolean;
-  offline?: boolean;
-  llm?: boolean;
-  help?: boolean;
-  version?: boolean;
-  task?: string;
-  source?: string[];
-  yes?: boolean;
-  always?: boolean;
-}
+function t(msg: string) { console.log(T.text(msg)); }
+function m(msg: string) { console.log(T.muted(msg)); }
+function g(msg: string) { console.log(T.green(msg)); }
+function r(msg: string) { console.log(T.red(msg)); }
+function a(msg: string) { console.log(T.accent(msg)); }
+function b(msg: string) { console.log(T.bold(msg)); }
+function d() { console.log(divider()); }
+function h(msg: string) { console.log(header(msg)); }
 
-interface ParseResult {
-  command: string | undefined;
-  positionals: string[];
-  flags: Flags;
-}
+async function cmdInit() {
+  console.log('');
+  h(`skill-surge init  v${VERSION}`);
+  d();
 
-function parseArgv(argv: string[]): ParseResult {
-  const flags: Flags = {};
-  const positionals: string[] = [];
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (!arg.startsWith('--')) {
-      positionals.push(arg);
-      continue;
-    }
-    const key = arg.slice(2);
-    if (['json', 'dry-run', 'network', 'offline', 'llm', 'help', 'version', 'yes', 'always'].includes(key)) {
-      (flags as Record<string, boolean | undefined>)[key] = true;
-      continue;
-    }
-    if (key === 'y') {
-      flags.yes = true;
-      continue;
-    }
-    const value = argv[i + 1];
-    if (!value || value.startsWith('--')) {
-      throw new Error(`Missing value for --${key}`);
-    }
-    if (key === 'source') {
-      flags.source = [...(flags.source || []), value];
-    } else {
-      flags[key] = value;
-    }
-    i++;
-  }
-
-  return { command: positionals[0], positionals: positionals.slice(1), flags };
-}
-
-async function commandInit(): Promise<number> {
-  console.log('\n' + infoBox(
-    ' INITIALIZING ',
-    gradient(['#00FFFF', '#FF00FF', '#FF6EC7'])(
-      '\n  Welcome to Skill Surge — your agent intelligence layer.\n' +
-      '  Setting up your environment...',
-    ),
-  ) + '\n');
-
-  const spinner = ora({ text: 'Scanning bundled skills...', color: 'magenta' }).start();
-  const config = loadConfig();
-  const bundled = scanBundleSkills(config);
-  spinner.succeed(`Found ${bundled.length} pre-bundled core skills`);
-
-  const envSpinner = ora({ text: 'Detecting local agent environment...', color: 'magenta' }).start();
-  const envInfo: { label: string; value: string }[] = [];
-
-  const home = os.homedir();
-  const codexSkills = fs.existsSync(path.join(home, '.codex', 'skills'));
-  const agentsSkills = fs.existsSync(path.join(home, '.agents', 'skills'));
-  envSpinner.succeed('Environment detected');
-
-  envInfo.push({ label: 'Node', value: process.version });
-  envInfo.push({ label: 'Codex Agent', value: codexSkills ? '✓ detected' : '— not found' });
-  envInfo.push({ label: 'Agent Skills', value: agentsSkills ? '✓ detected' : '— not found' });
-  envInfo.push({ label: 'Bundled Skills', value: String(bundled.length) });
-
-  const remoteSpinner = ora({ text: 'Checking connectivity...', color: 'magenta' }).start();
-  let skillsCliOk = false;
-  try {
-    const test = spawnSync('npx', ['skills', '--help'], {
-      encoding: 'utf8', timeout: 10_000, shell: false,
-    });
-    skillsCliOk = test.status === 0;
-  } catch {
-    // ignore
-  }
-
-  if (skillsCliOk) {
-    remoteSpinner.succeed('npx skills CLI available');
-    envInfo.push({ label: 'Skills CLI', value: '✓ reachable' });
+  const agents = detectAgents();
+  const installed = agents.filter(a => a.installed);
+  if (installed.length === 0) {
+    t('  No agent environments detected. Install one of: Claude Code, OpenCode, Cline, Cursor, etc.');
+    t('  skill-surge will install skills to global directories regardless.');
   } else {
-    remoteSpinner.warn('npx skills CLI not detected');
-    envInfo.push({ label: 'Skills CLI', value: '— not found' });
+    t('  Detected agents:');
+    for (const agent of installed) {
+      console.log(`    ${T.accent('▸')} ${T.white(agent.name)}    ${T.muted(agent.globalPath)}`);
+    }
   }
-
-  const cache = loadCache();
-  envInfo.push({ label: 'Cached Skills', value: String(cache.candidates.length) });
-
-  console.log('\n' + dashboardBox(envInfo) + '\n');
-
-  const readyMsg = gradient(['#39FF14', '#00FFFF'])(
-    '\n  ✓ SKILL SURGE READY\n' +
-    '  \n' +
-    '  Run:  skill-surge suggest --task "your task"\n' +
-    '  Or:   Start any prompt with: skill-surge: <your request>\n',
-  );
-  console.log(successBox(' READY ', readyMsg));
   console.log('');
 
-  // Write init marker
-  const initPath = path.join(home, '.config', 'skill-surge');
-  fs.mkdirSync(initPath, { recursive: true });
-  fs.writeFileSync(
-    path.join(initPath, '.init'),
-    JSON.stringify({ initializedAt: new Date().toISOString(), version: VERSION }, null, 2) + '\n',
-  );
+  const scopeChoices = ['Global only  (~/.claude/skills/)', 'Project only  (./.agents/skills/)', 'Both global and project'];
+  const scopeIdx = await select('Where should skills be installed?', scopeChoices);
+  const scopes = ['global', 'project', 'both'] as const;
+  const scope = scopes[scopeIdx];
 
-  return 0;
-}
-
-function commandDoctor(): number {
-  console.log('\n' + infoBox(
-    ' HEALTH CHECK ',
-    gradient(['#00FFFF', '#FF6EC7'])('\n  Skill Surge — system diagnostics\n'),
-  ) + '\n');
-
-  const entries: { label: string; value: string }[] = [];
-  entries.push({ label: 'Version', value: VERSION });
-  entries.push({ label: 'Node', value: process.version });
-  entries.push({ label: 'Platform', value: process.platform });
-  entries.push({ label: 'Arch', value: process.arch });
-
-  const config = loadConfig();
-  const home = os.homedir();
-  const bundlePath = getBundlePath();
-  const bundleExists = fs.existsSync(bundlePath);
-  entries.push({ label: 'Bundled Skills', value: bundleExists ? '✓ ' + fs.readdirSync(bundlePath).filter(f => f !== 'catalog.json').length + ' categories' : '✗ not found' });
-
-  const cache = loadCache();
-  entries.push({ label: 'Cache Entries', value: String(cache.candidates.length) });
-  entries.push({ label: 'Cache Generated', value: cache.generatedAt || 'never' });
-
-  const codexSkills = fs.existsSync(path.join(home, '.codex', 'skills'));
-  const agentsSkills = fs.existsSync(path.join(home, '.agents', 'skills'));
-  entries.push({ label: 'Codex Skills Dir', value: codexSkills ? '✓ exists' : '— missing' });
-  entries.push({ label: 'Agent Skills Dir', value: agentsSkills ? '✓ exists' : '— missing' });
-
-  const initDone = fs.existsSync(path.join(home, '.config', 'skill-surge', '.init'));
-  entries.push({ label: 'First-Run Complete', value: initDone ? '✓ yes' : '— not yet' });
-
-  console.log(dashboardBox(entries) + '\n');
-
-  const localPaths = config.localPaths || [];
-  const pathStatus = localPaths.map(p => {
-    const exists = fs.existsSync(p.replace(/^~/, home));
-    return `  ${exists ? '✓' : '✗'} ${p}`;
-  });
-  if (pathStatus.length > 0) {
-    console.log(infoBox(' SCAN PATHS ', pathStatus.join('\n')) + '\n');
-  }
-
-  const allGood = bundleExists;
-  if (allGood) {
-    console.log(successBox(' PASS ', '\n  All systems operational.\n') + '\n');
-  } else {
-    console.log(warningBox(' WARN ', '\n  Some checks did not pass. Run: skill-surge init\n') + '\n');
-  }
-
-  return allGood ? 0 : 1;
-}
-
-function commandRefresh(flags: Flags): number {
-  const spinner = ora({ text: 'Loading configuration...', color: 'magenta' }).start();
-  const config = loadConfig();
-
-  spinner.text = 'Scanning bundled skills...';
-  const bundled = scanBundleSkills(config);
-
-  spinner.text = 'Scanning local skills...';
-  const local = scanLocalCandidates(config);
-
-  const previous = loadCache();
-  const external = previous.candidates.filter(c => c.sourceKind !== 'local' && c.sourceKind !== 'bundled');
-  const notes: string[] = [`${bundled.length} bundled, ${local.length} local`];
-
-  if (flags.network) {
-    spinner.text = 'Querying network sources...';
-    const sourceList = [...(config.gitSources || []), ...(flags.source || [])];
-
-    for (const source of sourceList) {
-      const result = spawnSync('npx', ['skills', 'add', source, '--list'], {
-        encoding: 'utf8', timeout: 30_000, shell: false,
-      });
-      if (result.status === 0) {
-        notes.push(`Inspected ${source}.`);
-      } else {
-        const msg = result.stderr || result.stdout || 'unknown error';
-        notes.push(`Could not inspect ${source}: ${msg.trim()}`);
-      }
-    }
-  }
-
-  spinner.text = 'Writing cache...';
-  const cache = {
-    version: 1,
-    generatedAt: new Date().toISOString(),
-    candidates: mergeCandidates(bundled, local, external),
-  };
-
-  const actualPath = writeCache(cache);
-  spinner.succeed(`Cache written to ${actualPath}`);
-
-  if (!flags.json) {
-    console.log('\n' + dashboardBox([
-      { label: 'Bundled', value: String(bundled.length) },
-      { label: 'Local', value: String(local.length) },
-      { label: 'External', value: String(external.length) },
-      { label: 'Total Cached', value: String(cache.candidates.length) },
-    ]) + '\n');
-  } else {
-    console.log(JSON.stringify(cache, null, 2));
-  }
-
-  return 0;
-}
-
-function commandSuggest(flags: Flags): number {
-  const task = flags.task;
-  if (!task) {
-    console.error(errorBox('ERROR', '\n  suggest requires --task "<description>"\n'));
+  const agentsToUse = installed.length > 0 ? installed : agents.filter(a => a.globalPath.includes('agents'));
+  if (agentsToUse.length === 0) {
+    r('  No agent directories available. Aborting.');
     return 1;
   }
 
-  const config = loadConfig();
-  let cache = loadCache();
+  t(`  ${T.muted('Installing to:')} ${agentsToUse.map(a => a.name).join(', ')}`);
+  t(`  ${T.muted('Scope:')} ${scope}`);
+  console.log('');
+  d();
 
-  if (cache.candidates.length === 0) {
-    const spinner = ora({ text: 'Cache empty — scanning sources...', color: 'magenta' }).start();
-    const bundled = scanBundleSkills(config);
-    const local = scanLocalCandidates(config);
-    cache = {
-      version: 1,
-      generatedAt: new Date().toISOString(),
-      candidates: mergeCandidates(bundled, local),
-    };
-    writeCache(cache);
-    spinner.succeed(`Cached ${cache.candidates.length} skills`);
-  }
-
-  const notes: string[] = [];
-
-  let external: Candidate[] = [];
-  if (!flags.offline && process.env.AUTO_SKILLS_OFFLINE !== '1') {
-    const spinner = ora({ text: 'Querying npx skills find...', color: 'magenta' }).start();
-    const result = runSkillsFind(task);
-    external = result.candidates;
-    if (result.error) {
-      spinner.warn(`Remote search: ${result.error}`);
-      notes.push(`Remote search unavailable: ${result.error}`);
+  t('  Step 1/2 — Top-repo skills (via npx skills add)...');
+  const topRepoResults = installTopRepoSkills(agentsToUse, scope);
+  for (const result of topRepoResults) {
+    if (result.results.every(r => r.success)) {
+      g(`    ✓ ${result.repo} (${result.skills.join(', ')})`);
     } else {
-      spinner.succeed(`Found ${external.length} remote candidates`);
+      r(`    ✗ ${result.repo}: ${result.results.find(r => !r.success)?.error}`);
     }
   }
 
-  const rankSpinner = ora({ text: 'Scoring and ranking...', color: 'magenta' }).start();
-  let candidates = dedupeByName(
-    mergeCandidates(cache.candidates, external)
-      .map(c => scoreCandidate(c, task, config))
-      .filter(c => c.score > 25)
-      .sort((a, b) => b.score - a.score || String(a.name).localeCompare(String(b.name))),
-  ).slice(0, 12);
-
-  if (flags.llm) {
-    const reranked = rerankWithExternalCommand(task, candidates);
-    candidates = reranked.candidates;
-    notes.push(reranked.note);
+  t('  Step 2/2 — Original skills (copying)...');
+  const originals = ALL_SKILLS.filter(s => s.source === 'original');
+  for (const skill of originals) {
+    const installResults = installSkillToAgents(skill.name, agentsToUse, scope);
+    const success = installResults.filter(r => r.success).length;
+    const total = installResults.length;
+    if (success === total) {
+      g(`    ✓ ${skill.name}`);
+    } else if (success > 0) {
+      console.log(`    ${T.yellow('▸')} ${skill.name} (${success}/${total} agents)`);
+    } else {
+      r(`    ✗ ${skill.name}: ${installResults[0]?.error}`);
+    }
   }
 
-  rankSpinner.succeed(`${candidates.length} candidates ranked`);
+  console.log('');
+  g(`  Done. ${ALL_SKILLS.length} skills available across ${agentsToUse.length} agent(s).`);
+  t(`  Run ${T.accent('skill-surge scan')} to audit your project.`);
+  t(`  Run ${T.accent('skill-surge suggest "<task>"')} to find skills for a task.`);
+  console.log('');
+  return 0;
+}
 
-  const updatedCache = {
-    version: 1,
-    generatedAt: new Date().toISOString(),
-    candidates: mergeCandidates(cache.candidates, external).map(c => scoreCandidate(c, task, config)),
-  };
-  const actualPath = writeCache(updatedCache);
+async function cmdScan() {
+  const config = loadConfig();
+  const agents = detectAgents();
+  const installedAgents = agents.filter(a => a.installed);
 
-  const payload = { task, cachePath: actualPath, notes, candidates };
+  const globalPaths = installedAgents.map(a => resolveAgentPath(a, 'global'));
+  const projectPaths = installedAgents.map(a => resolveAgentPath(a, 'project'));
+  const allPaths = [...globalPaths, ...projectPaths];
 
-  if (flags.json) {
-    console.log(JSON.stringify(payload, null, 2));
-  } else {
-    printCandidates(payload);
+  const result = auditProject(allPaths);
+  const installedNames = new Set(result.installed.map(s => s.name));
 
-    const autoInstall = candidates.filter(c => c.canAutoInstall);
-    if (autoInstall.length > 0) {
-      console.log('\n' + successBox(
-        ' AUTO-INSTALL READY ',
-        `\n  ${autoInstall.length} candidate(s) pass the trust threshold.\n` +
-        '  Run: skill-surge install <id> [-y] to install.\n',
-      ) + '\n');
+  console.log('');
+  h(`skill-surge scan`);
+  d();
+  t(`  Project: ${T.accent(process.cwd().split('/').pop() || 'unknown')}`);
+  t(`  Detected: ${T.white(result.projectType.join(', '))}`);
+  t(`  Skills installed: ${T.green(String(result.installed.length))}`);
+  t(`  Skills available: ${T.white(String(result.available.length))}`);
+  console.log('');
+
+  function installedLine(s: { name: string; agent: string }): string {
+    const agentLabel = s.agent.includes('claude') ? 'Claude Code' : s.agent.includes('config') ? 'OpenCode' : 'Other';
+    return T.green('✓') + ' ' + T.white(s.name) + '  ' + T.muted('in ' + agentLabel);
+  }
+
+  if (result.installed.length > 0) {
+    const installedLines = result.installed.slice(0, 15).map(installedLine);
+    if (result.installed.length > 15) installedLines.push('  ...and ' + (result.installed.length - 15) + ' more');
+    console.log(box('  Installed', installedLines));
+    console.log('');
+  }
+
+  if (result.missing.length > 0) {
+    const recommendedLines = result.missing.slice(0, 10).map(s => T.muted('○') + ' ' + T.white(s.name) + '  ' + T.muted(s.description.slice(0, 50)));
+    if (result.missing.length > 10) recommendedLines.push('  ...and ' + (result.missing.length - 10) + ' more');
+    console.log(box('  Recommended', recommendedLines));
+    console.log('');
+  }
+
+  t(`  ${T.muted('Quick action:')} skill-surge suggest --task "..."  or  skill-surge install <skill>`);
+  console.log('');
+
+  if (result.missing.length > 0) {
+    const quickInstall = await confirm('Install all recommended skills now?', false);
+    if (quickInstall) {
+      for (const skill of result.missing) {
+        installSkillToAgents(skill.name, installedAgents, 'global');
+      }
+      g(`  Installed ${result.missing.length} skills.`);
     }
   }
 
   return 0;
 }
 
-function commandInstall(flags: Flags, positionals: string[]): number {
-  const candidateId = positionals[0];
-  if (!candidateId) {
-    console.error(errorBox('ERROR', '\n  install requires <candidate-id>\n'));
+async function cmdSuggest(args: string[]) {
+  let task = '';
+  let offline = false;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--task' && args[i + 1]) task = args[i + 1];
+    else if (args[i] === '--task=') task = args[i].split('=')[1];
+    else if (args[i] === '--offline') offline = true;
+    else if (!args[i].startsWith('--') && !task) task = args[i];
+  }
+
+  if (!task) {
+    r('  Usage: skill-surge suggest --task "build a login system"');
     return 1;
   }
 
-  const cache = loadCache();
-  const candidate = cache.candidates.find(c => c.id === candidateId);
-  if (!candidate) {
-    console.error(errorBox('NOT FOUND', `\n  Candidate not found: ${candidateId}\n`));
-    return 2;
+  const agents = detectAgents().filter(a => a.installed);
+  const allPaths = [
+    ...agents.map(a => resolveAgentPath(a, 'global')),
+    ...agents.map(a => resolveAgentPath(a, 'project')),
+  ];
+  const installedNames = new Set<string>();
+
+  for (const gp of allPaths) {
+    if (fs.existsSync(gp)) {
+      try {
+        for (const f of fs.readdirSync(gp)) {
+          if (f.endsWith('.md')) {
+            let name = f.replace(/\.md$/, '');
+            try {
+              const c = fs.readFileSync(path.join(gp, f), 'utf8');
+              if (c.startsWith('---')) {
+                const end = c.indexOf('\n---', 3);
+                if (end > 0) {
+                  for (const line of c.slice(3, end).split('\n')) {
+                    const m2 = line.match(/^name:\s*(.+)$/);
+                    if (m2) { name = m2[1].trim(); break; }
+                  }
+                }
+              }
+            } catch { /* use filename */ }
+            installedNames.add(name);
+          }
+        }
+      } catch { /* ignore */ }
+    }
   }
 
-  console.log('\n' + infoBox(' INSTALL CHECK ', `\n  Candidate: ${candidate.name}\n  Score: ${candidate.score}\n  Reason: ${candidate.reason}\n`) + '\n');
-
-  if (!candidate.canAutoInstall) {
-    console.error(errorBox(' BLOCKED ', `\n  Cannot auto-install "${candidate.name}":\n  ${candidate.reason}\n\n  Does not pass safety threshold.\n`));
-    return 3;
-  }
-
-  if (!flags.yes && !flags['dry-run']) {
-    console.log(warningBox(' CONFIRMATION ', `\n  Ready to install: ${candidate.name}\n\n  Pass --yes or -y to confirm.\n`));
+  const ranked = rankSkillsForTask(task, installedNames);
+  if (ranked.length === 0) {
+    t('  No matching skills found. Try different terms.');
     return 0;
   }
 
-  const result = installCandidate(candidate, Boolean(flags['dry-run']));
-  if (result.success) {
-    console.log(successBox(' INSTALLED ', `\n  ✓ ${candidate.name} installed successfully.\n`));
-  } else {
-    console.error(errorBox(' FAILED ', `\n  ✗ Install failed: ${result.error}\n`));
+  console.log('');
+  h(`skill-surge suggest`);
+  d();
+  t(`  Task: ${T.accent(task)}`);
+  t(`  Found: ${T.white(String(ranked.length))} skills`);
+  console.log('');
+
+  for (let i = 0; i < Math.min(ranked.length, 12); i++) {
+    const c = ranked[i];
+    const installed = c.installed ? T.green('installed ✓') : T.muted('not installed');
+    const scoreBar = '█'.repeat(Math.round(c.score / 10)) + '░'.repeat(10 - Math.round(c.score / 10));
+    const scoreColor = c.score >= 80 ? T.green : c.score >= 60 ? T.accent : T.muted;
+    console.log(`  ${T.white(String(i + 1).padStart(2, ' '))}. ${T.bold(c.name)}`);
+    console.log(`      ${scoreColor(scoreBar)} ${String(c.score).padStart(3)}/100  ${T.muted(c.description.slice(0, 55))}`);
+    console.log(`      ${installed}  ${T.muted(c.reason)}`);
+    console.log('');
   }
-  return result.code;
+
+  const topCandidate = ranked[0];
+  if (!topCandidate.installed) {
+    const doInstall = await confirm(`Install ${topCandidate.name}?`, false);
+    if (doInstall) {
+      installSkillToAgents(topCandidate.name, agents, 'global');
+      g(`  Installed ${topCandidate.name}.`);
+    }
+  }
+
+  return 0;
 }
 
-function commandHook(flags: Flags): number {
-  const task = flags.task;
+async function cmdInstall(args: string[]) {
+  let skillName = '';
+  let dryRun = false;
+
+  for (const arg of args) {
+    if (arg.startsWith('--')) continue;
+    if (arg === '-y' || arg === '--yes') dryRun = true;
+    else if (!arg.startsWith('--') && !skillName) skillName = arg;
+  }
+
+  if (!skillName) {
+    r('  Usage: skill-surge install <skill-name>');
+    return 1;
+  }
+
+  const skill = getSkillByName(skillName);
+  if (!skill) {
+    r(`  Skill "${skillName}" not found. Run skill-surge list to see available skills.`);
+    return 1;
+  }
+
+  const agents = detectAgents().filter(a => a.installed);
+  if (agents.length === 0) {
+    r('  No agent environments detected.');
+    return 1;
+  }
+
+  console.log('');
+  h(`skill-surge install  ${skill.name}`);
+  d();
+  t(`  ${T.muted(skill.description)}`);
+  console.log('');
+  t(`  ${T.muted('Install to which agents?')}`);
+
+  const choices = agents.map(a => `${a.name}  ${T.muted(a.globalPath)}`);
+  choices.push('All detected agents');
+
+  const choice = await select('Agent:', choices);
+  const selected = choice === agents.length ? agents : [agents[choice]];
+
+  const scopeChoice = await select('Scope:', ['Global  (~/.claude/skills/)', 'Project  (./.agents/skills/)', 'Both']);
+  const scopes = ['global', 'project', 'both'] as const;
+  const scope = scopes[scopeChoice];
+
+  console.log('');
+  t(`  Installing to: ${selected.map(a => a.name).join(', ')} (${scope})`);
+  if (dryRun) t('  (dry run — no changes made)');
+  console.log('');
+
+  const results = installSkillToAgents(skillName, selected, scope, { dryRun });
+  for (const res of results) {
+    if (res.success) g(`  ✓ ${res.skill} → ${res.agent}`);
+    else r(`  ✗ ${res.skill} → ${res.agent}: ${res.error}`);
+  }
+
+  return results.every(r => r.success) ? 0 : 1;
+}
+
+async function cmdList() {
+  const agents = detectAgents().filter(a => a.installed);
+  const allPaths = [
+    ...agents.map(a => resolveAgentPath(a, 'global')),
+    ...agents.map(a => resolveAgentPath(a, 'project')),
+  ];
+  const installedNames = new Set<string>();
+
+  for (const gp of allPaths) {
+    if (fs.existsSync(gp)) {
+      try {
+        for (const f of fs.readdirSync(gp)) {
+          if (f.endsWith('.md')) {
+            let name = f.replace(/\.md$/, '');
+            try {
+              const c = fs.readFileSync(path.join(gp, f), 'utf8');
+              if (c.startsWith('---')) {
+                const end = c.indexOf('\n---', 3);
+                if (end > 0) {
+                  for (const line of c.slice(3, end).split('\n')) {
+                    const m2 = line.match(/^name:\s*(.+)$/);
+                    if (m2) { name = m2[1].trim(); break; }
+                  }
+                }
+              }
+            } catch { /* use filename */ }
+            installedNames.add(name);
+          }
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  console.log('');
+  h(`skill-surge list`);
+  d();
+  t(`  ${T.white(String(installedNames.size))} skills installed across ${agents.length} agent(s).`);
+  console.log('');
+
+  const byCategory: Record<string, string[]> = {};
+  for (const skill of ALL_SKILLS) {
+    if (!byCategory[skill.category]) byCategory[skill.category] = [];
+    if (installedNames.has(skill.name)) byCategory[skill.category].push(skill.name);
+  }
+
+  for (const [cat, names] of Object.entries(byCategory)) {
+    if (names.length === 0) continue;
+    console.log(box(`  ${cat}`, names.map(n => `${T.green('✓')} ${T.white(n)}`)));
+    console.log('');
+  }
+
+  return 0;
+}
+
+async function cmdHook(args: string[]) {
+  let task = '';
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '--task' || args[i] === '--task=') && args[i + 1]) {
+      task = args[i] === '--task' ? args[i + 1] : (args[i] as string).split('=')[1];
+    } else if (!args[i].startsWith('--') && !task) {
+      task = args[i];
+    }
+  }
+
   if (!task) {
-    console.error(errorBox('ERROR', '\n  hook requires --task "<description>"\n'));
+    r('  Usage: skill-surge hook --task "build a dashboard"');
     return 1;
   }
 
   if (isTrivialTask(task)) {
-    const payload = { task, shouldSuggest: false, message: 'No skill suggestion for a trivial request.' };
-    if (flags.json) {
-      console.log(JSON.stringify(payload, null, 2));
-    } else {
-      console.log(payload.message);
-    }
+    const json = JSON.stringify({ task, shouldSuggest: false, detectedSkills: [], message: 'No skills detected for this task.' }, null, 2);
+    console.log(json);
     return 0;
   }
 
-  const config = loadConfig();
-  const cache = loadCache();
-  const candidates = dedupeByName(
-    cache.candidates
-      .map(c => scoreCandidate(c, task, config))
-      .filter(c => c.score >= 70)
-      .sort((a, b) => b.score - a.score),
-  ).slice(0, 3);
+  const agents = detectAgents().filter(a => a.installed);
+  const allPaths = [
+    ...agents.map(a => resolveAgentPath(a, 'global')),
+    ...agents.map(a => resolveAgentPath(a, 'project')),
+  ];
+  const installedNames = new Set<string>();
+
+  for (const gp of allPaths) {
+    if (fs.existsSync(gp)) {
+      try {
+        for (const f of fs.readdirSync(gp)) {
+          if (f.endsWith('.md')) {
+            let name = f.replace(/\.md$/, '');
+            try {
+              const c = fs.readFileSync(path.join(gp, f), 'utf8');
+              if (c.startsWith('---')) {
+                const end = c.indexOf('\n---', 3);
+                if (end > 0) {
+                  for (const line of c.slice(3, end).split('\n')) {
+                    const m2 = line.match(/^name:\s*(.+)$/);
+                    if (m2) { name = m2[1].trim(); break; }
+                  }
+                }
+              }
+            } catch { /* use filename */ }
+            installedNames.add(name);
+          }
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  const ranked = rankSkillsForTask(task, installedNames);
+  const topSkills = ranked.slice(0, 5);
+  const detectedNames = topSkills.map(s => s.name);
 
   const payload = {
     task,
-    shouldSuggest: candidates.length > 0,
-    message: candidates.length > 0
-      ? `Skill opportunity detected: ${candidates.map(c => c.name).join(', ')}`
-      : 'No strong cached skill suggestion for this request.',
-    candidates,
+    shouldSuggest: detectedNames.length > 0,
+    detectedSkills: detectedNames,
+    message: detectedNames.length > 0
+      ? `${detectedNames.length} skills detected. Run: skill-surge install <skill> --agent '*'`
+      : 'No skills detected for this task.',
   };
 
-  if (flags.json) {
-    console.log(JSON.stringify(payload, null, 2));
-  } else {
-    console.log(payload.message);
-  }
-
+  console.log(JSON.stringify(payload, null, 2));
   return 0;
 }
 
-function commandList(flags: Flags): number {
-  const cache = loadCache();
-
-  if (cache.candidates.length === 0) {
-    console.log(warningBox(' EMPTY ', '\n  No skills cached. Run: skill-surge refresh\n'));
-    return 0;
-  }
-
-  const bundled = cache.candidates.filter(c => c.sourceKind === 'bundled');
-  const local = cache.candidates.filter(c => c.sourceKind === 'local');
-  const remote = cache.candidates.filter(c => c.sourceKind !== 'bundled' && c.sourceKind !== 'local');
-
-  if (!flags.json) {
-    console.log('\n' + dashboardBox([
-      { label: 'Bundled', value: String(bundled.length) },
-      { label: 'Local', value: String(local.length) },
-      { label: 'Remote', value: String(remote.length) },
-      { label: 'Total', value: String(cache.candidates.length) },
-      { label: 'Cached At', value: cache.generatedAt || 'unknown' },
-    ]) + '\n');
-
-    if (cache.candidates.length > 0) {
-      console.log(renderCandidateTable(cache.candidates.slice(0, 25)));
-      if (cache.candidates.length > 25) {
-        console.log(`\n  ... and ${cache.candidates.length - 25} more\n`);
-      }
-    }
-    console.log('');
-  } else {
-    console.log(JSON.stringify(cache, null, 2));
-  }
-
-  return 0;
-}
-
-function commandSeed(): number {
+async function cmdConfig() {
   const config = loadConfig();
-  const spinner = ora({ text: 'Scanning bundled skills...', color: 'magenta' }).start();
-  const bundled = scanBundleSkills(config);
-
-  if (bundled.length === 0) {
-    spinner.fail('No bundled skills found.');
-    return 1;
-  }
-
-  spinner.succeed(`Found ${bundled.length} bundled skills`);
-
-  const cache = loadCache();
-  const existing = cache.candidates.filter(c => c.sourceKind !== 'bundled');
-  const updated = mergeCandidates(existing, bundled);
-  writeCache({
-    version: 1,
-    generatedAt: new Date().toISOString(),
-    candidates: updated,
-  });
-
-  console.log(successBox(' SEEDED ', `\n  ✓ ${bundled.length} bundled skills registered in cache\n`) + '\n');
-
-  for (const skill of bundled) {
-    const cat = skill.category || 'general';
-    console.log(`  ${gradient(['#FF6EC7', '#00FFFF'])('▸')} ${gradient(['#FF6EC7', '#00FFFF'])(skill.name)}  ${gradient(['#7B68EE', '#7B68EE'])('(' + cat + ')')}`);
-  }
   console.log('');
-
-  return 0;
-}
-
-function commandClean(): number {
-  const cleared = clearCache();
-  if (cleared) {
-    console.log(successBox(' CLEANED ', '\n  ✓ Cache cleared successfully.\n'));
-  } else {
-    console.log(warningBox(' NOTHING ', '\n  No cache files found.\n'));
-  }
-  return 0;
-}
-
-function commandConfig(): number {
-  const config = loadConfig();
+  h(`skill-surge config`);
+  d();
   console.log(JSON.stringify(config, null, 2));
   return 0;
 }
 
-// Entry point
+function printHelp() {
+  console.log('');
+  console.log(`  ${T.bold('skill-surge')}  ${T.muted(`v${VERSION}`)}`);
+  console.log('');
+  console.log(`  ${T.muted('Commands:')}`);
+  console.log(`    ${T.accent('init')}                 First-run setup — detect agents, install all skills`);
+  console.log(`    ${T.accent('scan')}                 Audit project — show installed vs available skills`);
+  console.log(`    ${T.accent('suggest')} --task "..." Find and rank skills for a task`);
+  console.log(`    ${T.accent('install')} <skill>       Install a skill to selected agents`);
+  console.log(`    ${T.accent('list')}                 List all installed skills`);
+  console.log(`    ${T.accent('hook')} --task "..."    Agent trigger — returns JSON for agent integration`);
+  console.log(`    ${T.accent('config')}                Show current configuration`);
+  console.log('');
+  console.log(`  ${T.muted('Examples:')}`);
+  console.log(`    skill-surge init`);
+  console.log(`    skill-surge scan`);
+  console.log(`    skill-surge suggest --task "build a login system with OAuth"`);
+  console.log(`    skill-surge install react-patterns`);
+  console.log(`    skill-surge hook --task "add user authentication"`);
+  console.log('');
+  console.log(`  ${T.muted('Docs:')}  ${T.accent('https://github.com/CodePuri/skill-surge')}`);
+  console.log('');
+}
+
+const COMMANDS: Record<string, (args: string[]) => Promise<number>> = {
+  init: cmdInit,
+  scan: cmdScan,
+  suggest: cmdSuggest,
+  install: cmdInstall,
+  list: cmdList,
+  hook: cmdHook,
+  config: cmdConfig,
+};
+
 (async () => {
-  process.exitCode = await (async () => {
-    try {
-      const { command, positionals, flags } = parseArgv(process.argv.slice(2));
+  const [, , command = 'help', ...args] = process.argv;
 
-      if (!flags.json && !flags.version && command !== 'version') {
-        renderSplash(VERSION);
-      }
+  if (command === '--help' || command === '-h' || command === 'help') {
+    printHelp();
+    process.exitCode = 0;
+    return;
+  }
+  if (command === '--version' || command === '-v' || command === 'version') {
+    console.log(VERSION);
+    process.exitCode = 0;
+    return;
+  }
 
-      if (!command || flags.help || command === 'help') {
-        console.log(renderHelp(VERSION));
-        return 0;
-      }
+  const handler = COMMANDS[command];
+  if (!handler) {
+    console.error(`\n  ${T.red('Unknown command:')} ${command}\n`);
+    printHelp();
+    process.exitCode = 1;
+    return;
+  }
 
-      if (flags.version || command === 'version') {
-        console.log(VERSION);
-        return 0;
-      }
-
-      switch (command) {
-        case 'init':
-          return await commandInit();
-        case 'doctor':
-          return commandDoctor();
-        case 'refresh':
-          return commandRefresh(flags);
-        case 'suggest':
-          return commandSuggest(flags);
-        case 'install':
-          return commandInstall(flags, positionals);
-        case 'hook':
-          return commandHook(flags);
-        case 'list':
-          return commandList(flags);
-        case 'seed':
-          return commandSeed();
-        case 'clean':
-          return commandClean();
-        case 'config':
-          return commandConfig();
-        default:
-          console.error(errorBox(' ERROR ', `\n  Unknown command: ${command}\n`));
-          console.log(renderHelp(VERSION));
-          return 1;
-      }
-    } catch (error) {
-      console.error(errorBox(' ERROR ', `\n  ${error instanceof Error ? error.message : String(error)}\n`));
-      console.log(renderHelp(VERSION));
-      return 1;
-    }
-  })();
+  try {
+    const code = await handler(args);
+    process.exitCode = code ?? 0;
+  } catch (err) {
+    console.error(`\n  ${T.red('Error:')} ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exitCode = 1;
+  }
 })();

@@ -1,53 +1,74 @@
-export interface Config {
-  localPaths: string[];
-  gitSources: string[];
-  trustedOwners: string[];
-  autoInstall: {
-    targetAgent?: string;
-    minimumScore?: number;
-    minimumInstallsForPublic?: number;
-  };
-  remoteRegistries?: string[];
-  preSeed?: {
-    enabled: boolean;
-    bundlePath?: string;
-  };
+export const VERSION = '2.0.0';
+
+export interface Agent {
+  name: string;
+  slug: string;
+  globalPath: string;
+  localPath: string;
+  installed: boolean;
 }
 
-export interface Candidate {
-  id: string;
+export interface Skill {
   name: string;
   description: string;
-  sourceKind: 'local' | 'skills-cli' | 'bundled' | 'registry';
-  source: string;
-  url: string | null;
-  installCount: number | null;
-  installCommand: string[] | null;
-  hash: string;
-  lastSeenAt: string;
-  score: number;
-  canAutoInstall: boolean;
-  reason: string;
-  category?: string;
-  packageSpec?: string;
+  category: string;
+  source: 'top-repo' | 'original';
+  repo?: string;
+  installs?: number;
+  tags: string[];
 }
 
-export interface Cache {
-  version: number;
-  generatedAt: string | null;
-  candidates: Candidate[];
+export interface InstalledSkill {
+  name: string;
+  agent: string;
+  path: string;
+  installedAt: string;
 }
 
-export interface SuggestPayload {
-  task: string;
-  cachePath: string;
-  notes: string[];
-  candidates: Candidate[];
+export interface ScanResult {
+  projectType: string[];
+  installed: InstalledSkill[];
+  available: Skill[];
+  missing: Skill[];
+  byCategory: Record<string, { installed: string[]; missing: string[] }>;
 }
 
 export interface HookPayload {
   task: string;
   shouldSuggest: boolean;
+  detectedSkills: string[];
   message: string;
-  candidates?: Candidate[];
+  candidates?: ScoredCandidate[];
+}
+
+export interface ScoredCandidate {
+  name: string;
+  description: string;
+  category: string;
+  score: number;
+  source: string;
+  installed: boolean;
+  reason: string;
+}
+
+export interface Config {
+  preferredAgents: string[];
+  installMode: 'copy' | 'symlink';
+  scope: 'global' | 'project' | 'both';
+  trustedOwners: string[];
+  customSources: string[];
+}
+
+export interface InitOptions {
+  scope: 'global' | 'project' | 'both';
+  agents: string[];
+  skills: string[];
+  dryRun?: boolean;
+}
+
+export interface InstallResult {
+  skill: string;
+  agent: string;
+  success: boolean;
+  error?: string;
 }

@@ -1,7 +1,7 @@
 {
   "name": "skill-surge",
-  "version": "1.0.1",
-  "description": "Plug-and-play agent intelligence. Pre-seeded with 14 core skills across frontend, backend, QA, design, architecture, and planning. Auto-discovers and installs skills from skills.sh, skillsmp.com, and community registries.",
+  "version": "2.0.0",
+  "description": "Your agent's skill library. 29 curated skills. Auto-install to Claude Code, OpenCode, Cline, and more.",
   "type": "module",
   "bin": {
     "skill-surge": "dist/cli.js"
@@ -13,7 +13,6 @@
   },
   "files": [
     "dist",
-    "skills",
     "config",
     "README.md",
     "SKILL.md",
@@ -26,28 +25,18 @@
   "keywords": [
     "ai-skills",
     "agent",
-    "codex",
     "claude",
     "skills",
     "cli",
-    "vaporwave",
-    "plug-and-play"
+    "black-terminal",
+    "agent-intelligence"
   ],
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
-    "@types/figlet": "^1.7.0",
-    "@types/node": "^25.6.2",
+    "@types/node": "^22.0.0",
     "typescript": "^5.8.0"
   },
-  "license": "MIT",
-  "dependencies": {
-    "boxen": "^8.0.1",
-    "chalk": "^5.6.2",
-    "cli-table3": "^0.6.5",
-    "figlet": "^1.11.0",
-    "gradient-string": "^3.0.0",
-    "ora": "^8.2.0"
-  }
+  "license": "MIT"
 }

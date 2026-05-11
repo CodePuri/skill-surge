@@ -1,116 +1,73 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
-import type { Config, Candidate } from '../types.js';
-import { getBundlePath } from './config.js';
+import type { Skill } from '../types.js';
 
-function sha(value: string): string {
-  return crypto.createHash('sha1').update(value).digest('hex');
+function expandHome(p: string): string {
+  if (p === '~') return os.homedir();
+  if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2));
+  if (p.startsWith('./')) return path.join(process.cwd(), p.slice(2));
+  return p;
 }
 
-function expandHome(value: string): string {
-  if (value === '~') return os.homedir();
-  if (value.startsWith('~/')) return path.join(os.homedir(), value.slice(2));
-  return value;
-}
-
-function parseFrontmatter(content: string): { name: string; description: string; [key: string]: string } | null {
-  if (!content.startsWith('---')) return null;
-  const end = content.indexOf('\n---', 3);
-  if (end === -1) return null;
-  const lines = content.slice(3, end).split(/\r?\n/);
-  const result: Record<string, string> = {};
-  for (const line of lines) {
-    const match = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (!match) continue;
-    let value = match[2].trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-    result[match[1]] = value;
-  }
-  if (!result.name || !result.description) return null;
-  return result as { name: string; description: string; [key: string]: string };
-}
-
-function findSkillFiles(root: string, maxDepth = 4): string[] {
-  const resolvedRoot = expandHome(root);
+function findSkillDirs(root: string, maxDepth = 3): string[] {
+  const resolved = expandHome(root);
+  if (!fs.existsSync(resolved)) return [];
   const found: string[] = [];
-  if (!fs.existsSync(resolvedRoot)) return found;
-
-  function visit(dir: string, depth: number): void {
+  function visit(dir: string, depth: number) {
     if (depth > maxDepth) return;
     let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (entry.isFile() && entry.name === 'SKILL.md') {
-        found.push(full);
-      } else if (entry.isDirectory() && !['.git', 'node_modules', 'dist', '.cache', '__pycache__'].includes(entry.name)) {
-        visit(full, depth + 1);
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+    catch { return; }
+    for (const e of entries) {
+      if (e.isDirectory() && !['node_modules', '.git', 'dist', '.cache'].includes(e.name)) {
+        const full = path.join(dir, e.name);
+        const skillMd = path.join(full, 'SKILL.md');
+        if (fs.existsSync(skillMd)) found.push(full);
+        else visit(full, depth + 1);
       }
     }
   }
-  visit(resolvedRoot, 0);
+  visit(resolved, 0);
   return found;
 }
 
-function candidateFromSkill(filePath: string, sourceKind: Candidate['sourceKind']): Candidate | null {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const metadata = parseFrontmatter(content);
-  if (!metadata) return null;
-  const sourceKey = path.dirname(filePath);
-  const dirName = path.basename(sourceKey);
-  return {
-    id: sha(`${sourceKind}:${sourceKey}`).slice(0, 12),
-    name: metadata.name || dirName,
-    description: metadata.description || 'No description.',
-    sourceKind,
-    source: sourceKey,
-    url: metadata.url || null,
-    installCount: null,
-    installCommand: null,
-    hash: sha(content),
-    lastSeenAt: new Date().toISOString(),
-    score: 0,
-    canAutoInstall: false,
-    reason: sourceKind === 'bundled' ? 'Pre-bundled skill shipped with skill-surge.' : 'Installed local skill.',
-    category: metadata.category || undefined,
-  };
+function parseSkillDir(dirPath: string): { name: string; skillMd: string } {
+  const dirName = path.basename(dirPath);
+  const skillMd = path.join(dirPath, 'SKILL.md');
+  let name = dirName;
+  try {
+    const content = fs.readFileSync(skillMd, 'utf8');
+    if (content.startsWith('---')) {
+      const end = content.indexOf('\n---', 3);
+      if (end > 0) {
+        for (const line of content.slice(3, end).split('\n')) {
+          const m = line.match(/^name:\s*(.+)$/);
+          if (m) { name = m[1].trim(); break; }
+        }
+      }
+    }
+  } catch { /* use dirName */ }
+  return { name, skillMd };
 }
 
-export function scanBundleSkills(config: Config): Candidate[] {
-  const bundlePath = getBundlePath();
-  const seen = new Set<string>();
-  const candidates: Candidate[] = [];
-
-  if (config.preSeed?.enabled !== false) {
-    for (const filePath of findSkillFiles(bundlePath, 5)) {
-      const candidate = candidateFromSkill(filePath, 'bundled');
-      if (!candidate || seen.has(candidate.id)) continue;
-      seen.add(candidate.id);
-      candidates.push(candidate);
+export function scanLocalSkills(agentPaths: string[]): { name: string; path: string; agentPath: string }[] {
+  const results: { name: string; path: string; agentPath: string }[] = [];
+  for (const ap of agentPaths) {
+    const resolved = expandHome(ap);
+    if (!fs.existsSync(resolved)) continue;
+    for (const skillDir of findSkillDirs(resolved, 3)) {
+      const { name, skillMd } = parseSkillDir(skillDir);
+      results.push({ name, path: skillMd, agentPath: ap });
     }
   }
-  return candidates;
+  return results;
 }
 
-export function scanLocalCandidates(config: Config): Candidate[] {
-  const seen = new Set<string>();
-  const candidates: Candidate[] = [];
-
-  for (const root of config.localPaths || []) {
-    for (const filePath of findSkillFiles(root)) {
-      const candidate = candidateFromSkill(filePath, 'local');
-      if (!candidate || seen.has(candidate.id)) continue;
-      seen.add(candidate.id);
-      candidates.push(candidate);
-    }
+export function getSkillContent(skillMdPath: string): string {
+  try {
+    return fs.readFileSync(skillMdPath, 'utf8');
+  } catch {
+    return '';
   }
-  return candidates;
 }
