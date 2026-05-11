@@ -19,7 +19,7 @@ import { logo, errorBanner, successBanner, sectionHeader, infoBox, progressBox, 
 import { skillsTable, candidateTable, installedTable, summaryLine, dashboardBox } from './ui/table.js';
 import { startSpinner, stopSpinner, stopSpinnerWithSuccess, stopSpinnerWithError } from './ui/spinner.js';
 
-const VERSION = '2.0.1';
+const VERSION = '2.1.1';
 const CYAN = C.brightCyan;
 const GREEN = C.brightGreen;
 const WHITE = C.white;
@@ -29,7 +29,7 @@ function t(msg: string) { console.log(T.text(msg)); }
 function m(msg: string) { console.log(T.muted(msg)); }
 function g(msg: string) { console.log(T.green(msg)); }
 function r(msg: string) { console.log(T.red(msg)); }
-function a(msg: string) { console.log(T.accent(msg)); }
+function a(msg: string) { return T.accent(msg); }
 function b(msg: string) { console.log(T.bold(msg)); }
 function d() { console.log(divider()); }
 function h(msg: string) { console.log(header(msg)); }
@@ -46,7 +46,7 @@ function printSplash() {
   console.log(`  ${CYAN}▸${RESET} skill-surge suggest    Find skills for a task`);
   console.log(`  ${CYAN}▸${RESET} skill-surge hook       Agent trigger (JSON)`);
   console.log('');
-  console.log(`  Docs: ${a('https://github.com/CodePuri/skill-surge')}`);
+  console.log('  Docs: ' + a('https://github.com/CodePuri/skill-surge'));
   console.log('');
 }
 
