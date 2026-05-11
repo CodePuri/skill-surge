@@ -9,7 +9,7 @@ const STOP = new Set([
 export function tokenize(value) {
     return new Set(String(value).toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length > 1 && !STOP.has(t)));
 }
-const SIMPLE = /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|date|time|pwd|ls|whoami|bye|goodbye|cool|nice|sure|great)$/i;
+const SIMPLE = /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|date|time|pwd|ls|whoami|bye|goodbye|cool|nice|sure|great)(,?\s*(thanks|ok|please|yeah|yep|nope|you)?)*$/i;
 export function isTrivialTask(task) {
     const terms = tokenize(task.trim());
     if (terms.size <= 1)

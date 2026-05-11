@@ -13,7 +13,7 @@ export function tokenize(value: string): Set<string> {
   );
 }
 
-const SIMPLE = /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|date|time|pwd|ls|whoami|bye|goodbye|cool|nice|sure|great)$/i;
+const SIMPLE = /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|date|time|pwd|ls|whoami|bye|goodbye|cool|nice|sure|great)(,?\s*(thanks|ok|please|yeah|yep|nope|you)?)*$/i;
 
 export function isTrivialTask(task: string): boolean {
   const terms = tokenize(task.trim());

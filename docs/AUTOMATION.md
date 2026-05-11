@@ -1,100 +1,78 @@
-# Skill Surge — Automation Policy
+# skill-surge — Automation Policy
 
-## Weekly Refresh Automation
+## Agent Hook (Proactive Skill Detection)
 
-### Job: `skill-surge-weekly-refresh`
-
-- **Schedule**: Every Monday at 09:00 Asia/Kolkata
-- **Command**: `node dist/cli.js refresh --network`
-- **Working directory**: `/Users/totem/Desktop/Code/skill-surge`
-- **Timeout**: 5 minutes
-
-### What It Does
-
-1. Loads configuration from `config/sources.json` and user override `~/.config/skill-surge/sources.json`
-2. Scans all bundled skills (`skills/` directory)
-3. Scans all local agent skill folders (`~/.codex/skills`, `~/.agents/skills`)
-4. If `--network` is set, inspects configured git sources (`https://github.com/vercel-labs/skills`)
-5. Writes updated cache to `~/.cache/skill-surge/index.json`
-
-### What It Does NOT Do
-
-- **NEVER installs skills** — `refresh` only discovers and caches
-- **NEVER modifies local skill files** — read-only operation
-- **NEVER auto-installs** — auto-install requires `install <id> -y` with explicit human consent
-- **NEVER uses `-y` flag on behalf of the user** — forbidden in all automation contexts
-
-### Cron Configuration
-
-```bash
-# Crontab entry for the automation user
-0 9 * * 1 cd /Users/totem/Desktop/Code/skill-surge && /usr/local/bin/node dist/cli.js refresh --network >> ~/.logs/skill-surge-refresh.log 2>&1
-```
-
-### Monitoring
-
-- Log output: `~/.logs/skill-surge-refresh.log`
-- Check last run: `tail -5 ~/.logs/skill-surge-refresh.log`
-- Cache last modified: `~/.cache/skill-surge/index.json`
-
-### Recovery on Failure
-
-If `refresh` fails (network timeout, permissions, etc.):
-
-1. The previous cache remains intact — no data loss
-2. Next successful run overwrites stale cache
-3. All commands fall back to `FALLBACK_CACHE_PATH` in temp directory if home cache is unavailable
-4. `skill-surge doctor` will report cache status
-
-### Manual Refresh
-
-```bash
-# Offline only (fast)
-node dist/cli.js refresh
-
-# With network discovery
-node dist/cli.js refresh --network
-
-# Dry run (preview without writing)
-node dist/cli.js refresh --dry-run
-```
-
-## Agent Hook (Proactive Suggestion)
-
-### Trigger Modes (3-Tier)
-
-**Tier 1 — Prompt Prefix** (zero config):
-```
-skill-surge: build a fullstack dashboard
-```
-Agent detects prefix → runs `skill-surge hook --task "build a fullstack dashboard" --json`
-
-**Tier 2 — Config File**:
-```json
-// ~/.config/skill-surge/trigger.json
-{ "alwaysSuggest": true }
-```
-Agent checks for this file on startup → runs hook on every substantial task
-
-**Tier 3 — Environment Variable**:
-```bash
-export SKILL_SURGE=true
-```
-Agent checks env var → runs hook proactively
+The `hook` command is the primary automation integration point. It receives a task description and returns JSON indicating which skills should be loaded.
 
 ### Hook Behavior
 
-- Trivial tasks (hi, hello, thanks, ok, etc.) → `shouldSuggest: false`
-- Non-trivial tasks → `shouldSuggest: true`, returns top 3 candidates
-- NEVER installs — only returns suggestions
-- Works fully offline (uses cached data)
+```
+skill-surge hook --task "build a dashboard"
+```
+
+**Trivial task detection** (via `isTrivialTask` in `src/core/ranker.ts`):
+- Empty or single-token tasks → `{ shouldSuggest: false }`
+- Simple words (hi, hello, ok, yes, thanks, etc.) → `{ shouldSuggest: false }`
+
+**Normal task detection**:
+- Tokenizes task (removes stopwords)
+- Matches against all 29 skills in `ALL_SKILLS` catalog
+- Returns top 5 ranked skills as `detectedSkills` array
+- Never installs — only returns suggestions
+
+### JSON Output Format
+
+```json
+{
+  "task": "build a login system with JWT",
+  "shouldSuggest": true,
+  "detectedSkills": ["auth-systems", "react-patterns", "system-design"],
+  "message": "3 skills detected. Run: skill-surge install <skill> --agent '*'"
+}
+```
+
+### Agent Integration
+
+Add to agent system prompt:
+
+```
+When the user references skill names or starts a prompt with "skill-surge:",
+run: skill-surge hook --task "<task description>"
+Load the detected SKILL.md files from the agent's skills directory.
+```
+
+## scan Command Automation
+
+`skill-surge scan` detects the project type (Node.js, React, Python, Rust, etc.) from package.json, requirements.txt, Cargo.toml. Use it in CI to verify skill coverage.
+
+```bash
+# CI check — fail if fewer than N skills installed
+skill-surge scan --json | jq '.installed | length'
+```
+
+## CLI Commands That Never Modify State
+
+- `hook` — read-only JSON output
+- `suggest` — read-only ranking display
+- `list` — read-only directory listing
+- `config` — read-only config display
+
+## CLI Commands That May Modify State
+
+- `init` — installs 29 skills to agent directories
+- `install` — installs one skill
+- `scan` — optional quick-install of recommended skills
+
+## Automation Rules
+
+1. **Never auto-install without user consent** — `init` and `install` always prompt unless `-y` is passed
+2. **Read-only commands are always safe** — hook, suggest, list, config
+3. **Cache is always read-first** — `loadCache()` is called before any state writes
+4. **Dry-run available** — `install <skill> --dry-run` for preview
 
 ## CI/CD Pipeline
 
 ```yaml
-# Example CI workflow for skill-surge
-on: [push, pull_request]
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -105,7 +83,7 @@ jobs:
           node-version: '20'
       - run: npm install
       - run: npm run build
-      - run: node dist/cli.js seed
-      - run: node dist/cli.js doctor
-      - run: node dist/cli.js suggest --task "react testing" --json --offline
+      - run: node dist/cli.js hook --task "build a login system" | jq -e '.shouldSuggest == true'
+      - run: node dist/cli.js suggest --task "react performance" --offline
+      - run: node dist/cli.js config
 ```

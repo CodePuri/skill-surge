@@ -1,64 +1,59 @@
-# Skill Surge — Project Handoff
+# skill-surge — Project Handoff
 
 ## Overview
 
-**Project**: Skill Surge (`skill-surge`) — plug-and-play agent intelligence CLI
+**Project**: skill-surge (`skill-surge`) — agent skill library CLI
 **Repository**: `git@github.com:CodePuri/skill-surge.git`
-**Current branch**: `main`
-**Version**: 1.0.1
+**Version**: 2.0.0
+**npm**: `npm install -g skill-surge`
 
 ## Project Structure
 
 ```
 skill-surge/
 ├── src/
-│   ├── cli.ts              # Main entry — command dispatch
-│   ├── types.ts            # TypeScript interfaces (Candidate, Cache, Config, etc.)
+│   ├── cli.ts              # Main entry — command dispatch (7 commands)
+│   ├── types.ts            # TypeScript interfaces (Agent, Skill, ScanResult, etc.)
 │   ├── core/
-│   │   ├── config.ts       # Configuration loading (user + default sources.json)
-│   │   ├── cache.ts        # JSON cache read/write (home + temp fallback)
-│   │   ├── scanner.ts      # SKILL.md discovery (bundle + local)
-│   │   ├── ranker.ts       # Scoring, tokenize, dedup, merge, LLM rerank
-│   │   ├── registrar.ts    # npx skills find + registry queries
-│   │   └── installer.ts     # Safety-gated install execution
+│   │   ├── agent.ts        # 11-agent detection registry
+│   │   ├── cache.ts        # JSON cache read/write (home + fallback)
+│   │   ├── config.ts       # Configuration loading (default + user sources.json)
+│   │   ├── catalog.ts      # ALL_SKILLS (29 entries), getSkillByName, getters
+│   │   ├── auditor.ts      # detectProjectType, auditProject → ScanResult
+│   │   ├── ranker.ts       # tokenize, isTrivialTask
+│   │   ├── registrar.ts    # runSkillsFind, rankSkillsForTask
+│   │   ├── scanner.ts      # scanLocalSkills, getSkillContent
+│   │   └── installer.ts    # installSkillToAgents, installTopRepoSkills
 │   └── ui/
-│       ├── splash.ts       # Vaporwave ASCII logo, help menu, printCandidates
-│       ├── box.ts          # boxen wrappers (info/success/warning/error/dashboard)
-│       └── table.ts        # cli-table3 candidate table
-├── skills/                 # 14 pre-bundled SKILL.md skills
-│   ├── catalog.json        # Skill index by category
-│   ├── frontend/           # react-patterns, css-mastery, tailwind-architecture
-│   ├── backend/            # node-api-design, database-patterns, auth-systems
-│   ├── qa/                 # testing-strategies, code-review-excellence
-│   ├── design/             # ui-ux-patterns, accessibility-first
-│   ├── architecture/       # system-design, microservices-patterns
-│   └── planning/           # project-planning, technical-writing
+│       ├── terminal.ts     # ANSI color system (C + T objects), box/divider/header
+│       └── prompt.ts       # ask/confirm/select/selectMultiple via readline
+├── skills/
+│   └── original/           # 11 original SKILL.md files (bundled skills)
 ├── config/
-│   └── sources.json        # Default config (paths, gitSources, trustedOwners)
+│   └── sources.json        # Default config (preferredAgents, installMode, scope, trustedOwners)
 ├── dist/                   # Compiled JS output
 ├── docs/                   # This directory
 ├── README.md               # GitHub landing page
-└── SKILL.md                # Portable agent-facing skill file
+└── SKILL.md                # Agent-facing skill file
 ```
 
-## CLI Commands
+## CLI Commands (7 total)
 
 | Command | Description |
 |---------|-------------|
-| `skill-surge init` | First-run wizard — registers bundled skills, detects environment |
-| `skill-surge doctor` | Health check — Node, cache, paths, connectivity |
-| `skill-surge seed` | Register all 14 bundled skills into cache |
-| `skill-surge suggest --task "..."` | Full pipeline: scan → score → rank → display |
-| `skill-surge suggest --task "..." --json` | JSON output for programmatic/agent use |
-| `skill-surge suggest --task "..." --offline` | Cache only, skip remote |
-| `skill-surge refresh` | Scan all sources into cache |
-| `skill-surge refresh --network` | + inspect remote git sources |
-| `skill-surge install <id> [-y]` | Safety-gated install |
-| `skill-surge install <id> --dry-run` | Preview without executing |
-| `skill-surge hook --task "..." [--json]` | Agent trigger check |
-| `skill-surge list` | Table of all cached skills |
-| `skill-surge clean` | Clear cache |
-| `skill-surge config` | Show current configuration |
+| `skill-surge init` | First-run wizard — detects agents, asks scope, installs all 29 skills |
+| `skill-surge scan` | Audit project — detect project type, show installed vs available skills |
+| `skill-surge suggest --task "..."` | Find and rank skills for a task |
+| `skill-surge install <skill>` | Install a specific skill to selected agents |
+| `skill-surge list` | List all installed skills across detected agents |
+| `skill-surge hook --task "..."` | Agent trigger — returns JSON with detected skills |
+| `skill-surge config` | Show current merged configuration |
+
+## Agent Registry (11 agents)
+
+Claude Code, OpenCode, Codex, Cline, Cursor, Windsurf, GitHub Copilot, Goose, Roo Code, Augment, Continue.
+
+Detection uses `fs.existsSync(expandPath(globalPath))` for each agent's skills directory.
 
 ## Paths & Locations
 
@@ -69,54 +64,46 @@ skill-surge/
 | Default config | `config/sources.json` |
 | User config override | `~/.config/skill-surge/sources.json` |
 | Default cache | `~/.cache/skill-surge/index.json` |
-| Init marker | `~/.config/skill-surge/.init` |
-| Agent skills | `~/.codex/skills/`, `~/.agents/skills/` |
+| Agent skills (global) | `~/.claude/skills/`, `~/.config/opencode/skills/`, etc. |
+| Agent skills (project) | `./.claude/skills/`, `./.agents/skills/`, etc. |
 
 ## Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
 | `SKILL_SURGE_CACHE` | Override cache file path |
-| `AUTO_SKILLS_OFFLINE=1` | Force offline mode for all commands |
-| `AUTO_SKILLS_LLM_COMMAND` | External command for LLM-based reranking |
-| `SKILL_SURGE=true` | Tier-3 trigger — agent runs hook proactively |
 
-## Weekly Automation
+## Skill Installation Flow
 
-- **Job name**: `skill-surge-weekly-refresh`
-- **Schedule**: Monday 09:00 Asia/Kolkata
-- **Command**: `node dist/cli.js refresh --network`
-- **Policy**: MUST NOT install skills — discovery only
+**init** command:
+1. Detect agents via `detectAgents()`
+2. Ask scope: global / project / both
+3. Run `installTopRepoSkills()` — `npx skills add` for each top-repo
+4. Run `installSkillToAgents()` for each original skill (copy from `skills/original/`)
 
-## Active Skill Location
-
-The active Codex skill is at: `/Users/totem/.codex/skills/skill-surge`
-This points to the `SKILL.md` at the repo root.
+**install** command:
+1. Validate skill name against `ALL_SKILLS` catalog
+2. Ask agent selection and scope
+3. If `source === 'top-repo'` → `npx skills add <repo> --skill <name> -g`
+4. If `source === 'original'` → `fs.copyFileSync` from bundled `skills/original/<name>/SKILL.md`
 
 ## Build & Test
 
 ```bash
-# Build
 npm run build
-
-# Test all commands
 node dist/cli.js --help
-node dist/cli.js seed
-node dist/cli.js doctor
-node dist/cli.js suggest --task "react performance" --json --offline
-node dist/cli.js hook --task "hello" --json
-node dist/cli.js hook --task "build a responsive dashboard UI with accessibility" --json
+node dist/cli.js hook --task "hello"
+node dist/cli.js hook --task "build a login system"
+node dist/cli.js suggest --task "react performance" --offline
+node dist/cli.js suggest --task "design a database schema"
 node dist/cli.js list
-node dist/cli.js clean
-node dist/cli.js seed
+node dist/cli.js config
+
+npm test
 ```
 
 ## npm Publishing
 
 ```bash
 npm publish --access public
-# Package name: skill-surge
-# Bin: skill-surge
 ```
-
-After publish: `npm install -g skill-surge` → `skill-surge suggest --task "..."`

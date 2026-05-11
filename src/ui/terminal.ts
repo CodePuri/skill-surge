@@ -49,7 +49,8 @@ export const T = {
   pad: (n: number) => ' '.repeat(n),
 };
 
-export function box(title: string, lines: string[]): string {
+export function box(title: string, linesArg?: string[]): string {
+  const lines = linesArg ?? [];
   const width = Math.min(72, Math.max(40, ...lines.map(l => l.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '').length)) + 4);
   const titlePadded = ` ${title} `;
   const top = `${C.brightBlack}┌─${titlePadded}${'─'.repeat(Math.max(0, width - titlePadded.length - 1))}─┐${C.reset}`;

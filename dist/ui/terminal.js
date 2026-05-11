@@ -43,7 +43,8 @@ export const T = {
     bullet: (s) => `${C.brightBlack}•${C.reset} ${s}`,
     pad: (n) => ' '.repeat(n),
 };
-export function box(title, lines) {
+export function box(title, linesArg) {
+    const lines = linesArg ?? [];
     const width = Math.min(72, Math.max(40, ...lines.map(l => l.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '').length)) + 4);
     const titlePadded = ` ${title} `;
     const top = `${C.brightBlack}┌─${titlePadded}${'─'.repeat(Math.max(0, width - titlePadded.length - 1))}─┐${C.reset}`;

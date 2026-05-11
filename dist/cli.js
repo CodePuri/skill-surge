@@ -324,8 +324,12 @@ async function cmdList() {
 async function cmdHook(args) {
     let task = '';
     for (let i = 0; i < args.length; i++) {
-        if ((args[i] === '--task' || args[i] === '--task=') && args[i + 1]) {
-            task = args[i] === '--task' ? args[i + 1] : args[i].split('=')[1];
+        if (args[i] === '--task' && args[i + 1]) {
+            task = args[i + 1];
+            i++;
+        }
+        else if (args[i].startsWith('--task=')) {
+            task = args[i].slice('--task='.length);
         }
         else if (!args[i].startsWith('--') && !task) {
             task = args[i];
@@ -392,9 +396,12 @@ async function cmdHook(args) {
 async function cmdConfig() {
     const config = loadConfig();
     console.log('');
-    h(`skill-surge config`);
-    d();
-    console.log(JSON.stringify(config, null, 2));
+    console.log(T.muted('┌' + '─'.repeat(74) + '─┐'));
+    console.log(T.bold('  skill-surge config'));
+    console.log(T.muted('└' + '─'.repeat(74) + '─┘'));
+    console.log('');
+    const stripped = JSON.stringify(config, null, 2).replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+    console.log(stripped);
     return 0;
 }
 function printHelp() {
