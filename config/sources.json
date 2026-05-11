@@ -1,21 +1,28 @@
 {
   "localPaths": [
     "~/.codex/skills",
-    "~/.agents/skills",
-    "/Users/totem/Desktop/Code/Skills"
+    "~/.agents/skills"
   ],
   "gitSources": [
     "https://github.com/vercel-labs/skills"
+  ],
+  "remoteRegistries": [
+    "https://skills.sh",
+    "https://skillsmp.com/categories/automation-tools"
   ],
   "trustedOwners": [
     "vercel-labs",
     "anthropics",
     "microsoft",
-    "openai"
+    "openai",
+    "codepuri"
   ],
   "autoInstall": {
     "targetAgent": "codex",
     "minimumScore": 70,
     "minimumInstallsForPublic": 1000
+  },
+  "preSeed": {
+    "enabled": true
   }
 }

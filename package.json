@@ -1,26 +1,50 @@
 {
-  "name": "skill-aggregator",
-  "version": "0.1.0",
-  "description": "Aggregate, rank, and install relevant agent skills for Codex tasks.",
+  "name": "autoskills",
+  "version": "1.0.0",
+  "description": "Plug-and-play agent intelligence. Pre-seeded with 14 core skills across frontend, backend, QA, design, architecture, and planning. Auto-discovers and installs skills from skills.sh, skillsmp.com, and community registries.",
   "type": "module",
   "bin": {
-    "skill-aggregator": "./dist/cli.js"
+    "autoskills": "./dist/cli.js",
+    "auto-skills": "./dist/cli.js"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "start": "node dist/cli.js",
-    "check": "node --check dist/cli.js",
-    "build": "tsc -p tsconfig.json"
+    "prepublishOnly": "npm run build"
   },
   "files": [
     "dist",
+    "skills",
     "config",
-    "README.md"
+    "README.md",
+    "SKILL.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "ai-skills",
+    "agent",
+    "codex",
+    "claude",
+    "skills",
+    "cli",
+    "vaporwave",
+    "plug-and-play"
   ],
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
+    "@types/figlet": "^1.7.0",
+    "@types/node": "^25.6.2",
     "typescript": "^5.8.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "figlet": "^1.11.0",
+    "gradient-string": "^3.0.0",
+    "ora": "^8.2.0"
+  }
 }
