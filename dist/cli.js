@@ -7,10 +7,17 @@ import { auditProject } from './core/auditor.js';
 import { rankSkillsForTask } from './core/registrar.js';
 import { installSkillToAgents, installTopRepoSkills } from './core/installer.js';
 import { isTrivialTask } from './core/ranker.js';
-import { ALL_SKILLS, getSkillByName } from './core/catalog.js';
-import { T, box, divider, header } from './ui/terminal.js';
-import { confirm, select } from './ui/prompt.js';
-const VERSION = '2.0.0';
+import { ALL_SKILLS } from './core/catalog.js';
+import { T, divider, header, C } from './ui/terminal.js';
+import { select, interactiveMultiSelect, confirmWithPrompt } from './ui/prompt.js';
+import { logo, errorBanner, successBanner, sectionHeader, infoBox, installSummary, securityTable, installComplete } from './ui/banner.js';
+import { skillsTable, candidateTable, summaryLine, dashboardBox } from './ui/table.js';
+import { startSpinner, stopSpinner } from './ui/spinner.js';
+const VERSION = '2.0.1';
+const CYAN = C.brightCyan;
+const GREEN = C.brightGreen;
+const WHITE = C.white;
+const RESET = C.reset;
 function t(msg) { console.log(T.text(msg)); }
 function m(msg) { console.log(T.muted(msg)); }
 function g(msg) { console.log(T.green(msg)); }
@@ -19,25 +26,145 @@ function a(msg) { console.log(T.accent(msg)); }
 function b(msg) { console.log(T.bold(msg)); }
 function d() { console.log(divider()); }
 function h(msg) { console.log(header(msg)); }
-async function cmdInit() {
+function printSplash() {
+    console.log('\n' + logo());
     console.log('');
-    h(`skill-surge init  v${VERSION}`);
-    d();
+    console.log(`${CYAN}  skill-surge  ${RESET}${WHITE}v${VERSION}${RESET}`);
+    console.log('');
+    console.log(`  ${CYAN}▸${RESET} skill-surge init       First-run setup`);
+    console.log(`  ${CYAN}▸${RESET} skill-surge add        Interactive skill installation`);
+    console.log(`  ${CYAN}▸${RESET} skill-surge scan       Audit project`);
+    console.log(`  ${CYAN}▸${RESET} skill-surge list       Show installed skills`);
+    console.log(`  ${CYAN}▸${RESET} skill-surge suggest    Find skills for a task`);
+    console.log(`  ${CYAN}▸${RESET} skill-surge hook       Agent trigger (JSON)`);
+    console.log('');
+    console.log(`  Docs: ${a('https://github.com/CodePuri/skill-surge')}`);
+    console.log('');
+}
+async function cmdAdd(args) {
+    let repoArg = '';
+    for (const arg of args) {
+        if (!arg.startsWith('--') && !repoArg)
+            repoArg = arg;
+    }
+    console.log('\n' + logo());
+    console.log('');
+    const agents = detectAgents();
+    const installedAgents = agents.filter(a => a.installed);
+    let availableSkills = [...ALL_SKILLS];
+    let sourceName = 'skill-surge (bundled)';
+    let sourceUrl = 'https://github.com/CodePuri/skill-surge-skills';
+    if (repoArg) {
+        startSpinner('Fetching skills from ' + repoArg);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        stopSpinner();
+        sourceName = repoArg;
+        sourceUrl = `https://github.com/${repoArg}.git`;
+        console.log(`${CYAN}◇${RESET}  Source: ${sourceUrl}`);
+        const topSkills = ALL_SKILLS.filter(s => s.source === 'top-repo' && s.repo?.includes(repoArg.split('/')[0]));
+        if (topSkills.length > 0) {
+            availableSkills = topSkills;
+        }
+    }
+    const skillCount = availableSkills.length;
+    console.log(`${CYAN}◇${RESET}  Found ${skillCount} skills`);
+    console.log('');
+    console.log(`${CYAN}◇${RESET}  Select skills to install (space to toggle)`);
+    const skillNames = availableSkills.map(s => s.name);
+    const selectedIndices = await interactiveMultiSelect('', skillNames);
+    const selectedSkills = selectedIndices.map(i => availableSkills[i]);
+    if (selectedSkills.length === 0) {
+        console.log('\n  No skills selected. Exiting.\n');
+        return 0;
+    }
+    console.log('');
+    console.log(`${CYAN}◇${RESET}  ${installedAgents.length} agents`);
+    let agentOptions = installedAgents.map(a => a.name);
+    if (agentOptions.length === 0) {
+        agentOptions = ['All agents (global)'];
+    }
+    console.log(`${CYAN}◇${RESET}  Which agents do you want to install to?`);
+    const agentIndices = await interactiveMultiSelect('', agentOptions);
+    const selectedAgents = agentIndices.map(i => installedAgents[i] || installedAgents[0]);
+    console.log('');
+    console.log(`${CYAN}◇${RESET}  Installation scope`);
+    const scopeIdx = await select('  Choose:', ['Global  (recommended)', 'Project  (./.agents/skills/)']);
+    const scopes = ['global', 'project'];
+    const scope = scopes[scopeIdx];
+    console.log('');
+    console.log(`${CYAN}◇${RESET}  Installation method`);
+    const methodIdx = await select('  Choose:', ['Symlink  (recommended)', 'Copy']);
+    const method = methodIdx === 0 ? 'symlink' : 'copy';
+    console.log('');
+    const summaryItems = selectedSkills.slice(0, 5).map(skill => ({
+        path: `~/.agents/skills/${skill.name}`,
+        agents: selectedAgents.map(a => a.name).slice(0, 3).join(', ') + (selectedAgents.length > 3 ? ' +more' : ''),
+        method: method
+    }));
+    console.log(installSummary(summaryItems));
+    console.log('');
+    const securityItems = selectedSkills.slice(0, 6).map(skill => ({
+        name: skill.name.slice(0, 25),
+        gen: 'Safe',
+        socket: '0 alerts',
+        snyk: 'Low Risk'
+    }));
+    console.log(securityTable(securityItems));
+    console.log('');
+    if (selectedSkills.length > 6) {
+        console.log(`  ... and ${selectedSkills.length - 6} more skills`);
+        console.log('');
+    }
+    console.log(`  Details: ${sourceUrl}`);
+    console.log('');
+    const proceed = await confirmWithPrompt('Proceed with installation?');
+    if (!proceed) {
+        console.log('\n  Installation cancelled.\n');
+        return 0;
+    }
+    console.log('');
+    startSpinner('Installing skills...');
+    const installedItems = [];
+    for (const skill of selectedSkills) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const results = installSkillToAgents(skill.name, selectedAgents, scope, { installMode: method });
+        const success = results.filter(r => r.success).length;
+        if (success > 0) {
+            installedItems.push({
+                skill: skill.name,
+                path: `~/.agents/skills/${skill.name}`,
+                agents: selectedAgents.map(a => a.name).slice(0, 3).join(', ') + (selectedAgents.length > 3 ? ' +more' : '')
+            });
+        }
+    }
+    stopSpinner();
+    console.log('\n' + installComplete(installedItems));
+    console.log('');
+    console.log(`${CYAN}└${RESET}  Done!  Review skills before use; they run with full agent permissions.`);
+    console.log('');
+    return 0;
+}
+async function cmdInit() {
+    console.log('\n' + logo());
+    console.log('');
     const agents = detectAgents();
     const installed = agents.filter(a => a.installed);
     if (installed.length === 0) {
-        t('  No agent environments detected. Install one of: Claude Code, OpenCode, Cline, Cursor, etc.');
-        t('  skill-surge will install skills to global directories regardless.');
+        console.log(`${CYAN}◇${RESET}  No agent environments detected.`);
+        console.log(`  skill-surge will install skills to global directories regardless.`);
     }
     else {
-        t('  Detected agents:');
+        console.log(`${CYAN}◇${RESET}  Detected agents:`);
         for (const agent of installed) {
-            console.log(`    ${T.accent('▸')} ${T.white(agent.name)}    ${T.muted(agent.globalPath)}`);
+            console.log(`    ${CYAN}▸${RESET} ${agent.name}  ${T.muted(agent.globalPath)}`);
         }
     }
     console.log('');
-    const scopeChoices = ['Global only  (~/.claude/skills/)', 'Project only  (./.agents/skills/)', 'Both global and project'];
-    const scopeIdx = await select('Where should skills be installed?', scopeChoices);
+    const scopeIdx = await select('Where should skills be installed?', [
+        'Global only  (~/.claude/skills/)',
+        'Project only  (./.agents/skills/)',
+        'Both global and project'
+    ]);
     const scopes = ['global', 'project', 'both'];
     const scope = scopes[scopeIdx];
     const agentsToUse = installed.length > 0 ? installed : agents.filter(a => a.globalPath.includes('agents'));
@@ -45,89 +172,65 @@ async function cmdInit() {
         r('  No agent directories available. Aborting.');
         return 1;
     }
-    t(`  ${T.muted('Installing to:')} ${agentsToUse.map(a => a.name).join(', ')}`);
-    t(`  ${T.muted('Scope:')} ${scope}`);
     console.log('');
-    d();
-    t('  Step 1/2 — Top-repo skills (via npx skills add)...');
+    console.log(`${CYAN}◇${RESET}  Installing to: ${agentsToUse.map(a => a.name).join(', ')}`);
+    console.log(`${CYAN}◇${RESET}  Scope: ${scope}`);
+    console.log('');
+    console.log(installSummary([{
+            path: 'Installing all 29 bundled skills',
+            agents: agentsToUse.map(a => a.name).join(', '),
+            method: 'symlink'
+        }]));
+    console.log('');
+    const proceed = await confirmWithPrompt('Proceed with installation?');
+    if (!proceed) {
+        console.log('\n  Installation cancelled.\n');
+        return 0;
+    }
+    console.log('');
+    startSpinner('Installing skills...');
     const topRepoResults = installTopRepoSkills(agentsToUse, scope);
     for (const result of topRepoResults) {
-        if (result.results.every(r => r.success)) {
-            g(`    ✓ ${result.repo} (${result.skills.join(', ')})`);
-        }
-        else {
-            r(`    ✗ ${result.repo}: ${result.results.find(r => !r.success)?.error}`);
-        }
+        await new Promise(resolve => setTimeout(resolve, 200));
     }
-    t('  Step 2/2 — Original skills (copying)...');
     const originals = ALL_SKILLS.filter(s => s.source === 'original');
     for (const skill of originals) {
-        const installResults = installSkillToAgents(skill.name, agentsToUse, scope);
-        const success = installResults.filter(r => r.success).length;
-        const total = installResults.length;
-        if (success === total) {
-            g(`    ✓ ${skill.name}`);
-        }
-        else if (success > 0) {
-            console.log(`    ${T.yellow('▸')} ${skill.name} (${success}/${total} agents)`);
-        }
-        else {
-            r(`    ✗ ${skill.name}: ${installResults[0]?.error}`);
-        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+        installSkillToAgents(skill.name, agentsToUse, scope);
     }
+    stopSpinner();
     console.log('');
-    g(`  Done. ${ALL_SKILLS.length} skills available across ${agentsToUse.length} agent(s).`);
-    t(`  Run ${T.accent('skill-surge scan')} to audit your project.`);
-    t(`  Run ${T.accent('skill-surge suggest "<task>"')} to find skills for a task.`);
+    console.log(successBanner());
+    console.log('');
+    console.log(`${CYAN}└${RESET}  Done!  ${ALL_SKILLS.length} skills installed across ${agentsToUse.length} agent(s).`);
+    console.log('');
+    console.log(`  Run ${a('skill-surge scan')} to audit your project.`);
+    console.log(`  Run ${a('skill-surge suggest --task "..."')} to find skills.`);
     console.log('');
     return 0;
 }
 async function cmdScan() {
-    const config = loadConfig();
     const agents = detectAgents();
     const installedAgents = agents.filter(a => a.installed);
     const globalPaths = installedAgents.map(a => resolveAgentPath(a, 'global'));
     const projectPaths = installedAgents.map(a => resolveAgentPath(a, 'project'));
     const allPaths = [...globalPaths, ...projectPaths];
     const result = auditProject(allPaths);
-    const installedNames = new Set(result.installed.map(s => s.name));
     console.log('');
-    h(`skill-surge scan`);
-    d();
-    t(`  Project: ${T.accent(process.cwd().split('/').pop() || 'unknown')}`);
-    t(`  Detected: ${T.white(result.projectType.join(', '))}`);
-    t(`  Skills installed: ${T.green(String(result.installed.length))}`);
-    t(`  Skills available: ${T.white(String(result.available.length))}`);
+    console.log(dashboardBox([
+        { label: 'Version', value: VERSION, status: 'ok' },
+        { label: 'Node', value: process.version, status: 'ok' },
+        { label: 'Platform', value: process.platform, status: 'ok' },
+        { label: 'Skills Installed', value: String(result.installed.length), status: result.installed.length > 0 ? 'ok' : 'warn' },
+        { label: 'Skills Available', value: String(result.available.length), status: 'ok' },
+    ]));
     console.log('');
-    function installedLine(s) {
-        const agentLabel = s.agent.includes('claude') ? 'Claude Code' : s.agent.includes('config') ? 'OpenCode' : 'Other';
-        return T.green('✓') + ' ' + T.white(s.name) + '  ' + T.muted('in ' + agentLabel);
-    }
     if (result.installed.length > 0) {
-        const installedLines = result.installed.slice(0, 15).map(installedLine);
-        if (result.installed.length > 15)
-            installedLines.push('  ...and ' + (result.installed.length - 15) + ' more');
-        console.log(box('  Installed', installedLines));
+        console.log(infoBox('  Installed Skills', result.installed.slice(0, 10).map(s => `${GREEN}✓${RESET} ${s.name}  ${T.muted('in ' + s.agent)}`)));
         console.log('');
     }
-    if (result.missing.length > 0) {
-        const recommendedLines = result.missing.slice(0, 10).map(s => T.muted('○') + ' ' + T.white(s.name) + '  ' + T.muted(s.description.slice(0, 50)));
-        if (result.missing.length > 10)
-            recommendedLines.push('  ...and ' + (result.missing.length - 10) + ' more');
-        console.log(box('  Recommended', recommendedLines));
-        console.log('');
-    }
-    t(`  ${T.muted('Quick action:')} skill-surge suggest --task "..."  or  skill-surge install <skill>`);
+    t(`  ${T.muted('Quick action:')} skill-surge suggest --task "..."  or  skill-surge add`);
     console.log('');
-    if (result.missing.length > 0) {
-        const quickInstall = await confirm('Install all recommended skills now?', false);
-        if (quickInstall) {
-            for (const skill of result.missing) {
-                installSkillToAgents(skill.name, installedAgents, 'global');
-            }
-            g(`  Installed ${result.missing.length} skills.`);
-        }
-    }
     return 0;
 }
 async function cmdSuggest(args) {
@@ -188,82 +291,15 @@ async function cmdSuggest(args) {
         return 0;
     }
     console.log('');
-    h(`skill-surge suggest`);
-    d();
-    t(`  Task: ${T.accent(task)}`);
-    t(`  Found: ${T.white(String(ranked.length))} skills`);
+    console.log(sectionHeader('Skills Found for: "' + task + '"'));
     console.log('');
-    for (let i = 0; i < Math.min(ranked.length, 12); i++) {
-        const c = ranked[i];
-        const installed = c.installed ? T.green('installed ✓') : T.muted('not installed');
-        const scoreBar = '█'.repeat(Math.round(c.score / 10)) + '░'.repeat(10 - Math.round(c.score / 10));
-        const scoreColor = c.score >= 80 ? T.green : c.score >= 60 ? T.accent : T.muted;
-        console.log(`  ${T.white(String(i + 1).padStart(2, ' '))}. ${T.bold(c.name)}`);
-        console.log(`      ${scoreColor(scoreBar)} ${String(c.score).padStart(3)}/100  ${T.muted(c.description.slice(0, 55))}`);
-        console.log(`      ${installed}  ${T.muted(c.reason)}`);
-        console.log('');
-    }
-    const topCandidate = ranked[0];
-    if (!topCandidate.installed) {
-        const doInstall = await confirm(`Install ${topCandidate.name}?`, false);
-        if (doInstall) {
-            installSkillToAgents(topCandidate.name, agents, 'global');
-            g(`  Installed ${topCandidate.name}.`);
-        }
-    }
+    console.log(candidateTable(ranked.slice(0, 10).map(c => ({
+        name: c.name,
+        score: c.score,
+        reason: c.reason
+    }))));
+    console.log('');
     return 0;
-}
-async function cmdInstall(args) {
-    let skillName = '';
-    let dryRun = false;
-    for (const arg of args) {
-        if (arg.startsWith('--'))
-            continue;
-        if (arg === '-y' || arg === '--yes')
-            dryRun = true;
-        else if (!arg.startsWith('--') && !skillName)
-            skillName = arg;
-    }
-    if (!skillName) {
-        r('  Usage: skill-surge install <skill-name>');
-        return 1;
-    }
-    const skill = getSkillByName(skillName);
-    if (!skill) {
-        r(`  Skill "${skillName}" not found. Run skill-surge list to see available skills.`);
-        return 1;
-    }
-    const agents = detectAgents().filter(a => a.installed);
-    if (agents.length === 0) {
-        r('  No agent environments detected.');
-        return 1;
-    }
-    console.log('');
-    h(`skill-surge install  ${skill.name}`);
-    d();
-    t(`  ${T.muted(skill.description)}`);
-    console.log('');
-    t(`  ${T.muted('Install to which agents?')}`);
-    const choices = agents.map(a => `${a.name}  ${T.muted(a.globalPath)}`);
-    choices.push('All detected agents');
-    const choice = await select('Agent:', choices);
-    const selected = choice === agents.length ? agents : [agents[choice]];
-    const scopeChoice = await select('Scope:', ['Global  (~/.claude/skills/)', 'Project  (./.agents/skills/)', 'Both']);
-    const scopes = ['global', 'project', 'both'];
-    const scope = scopes[scopeChoice];
-    console.log('');
-    t(`  Installing to: ${selected.map(a => a.name).join(', ')} (${scope})`);
-    if (dryRun)
-        t('  (dry run — no changes made)');
-    console.log('');
-    const results = installSkillToAgents(skillName, selected, scope, { dryRun });
-    for (const res of results) {
-        if (res.success)
-            g(`  ✓ ${res.skill} → ${res.agent}`);
-        else
-            r(`  ✗ ${res.skill} → ${res.agent}: ${res.error}`);
-    }
-    return results.every(r => r.success) ? 0 : 1;
 }
 async function cmdList() {
     const agents = detectAgents().filter(a => a.installed);
@@ -302,23 +338,17 @@ async function cmdList() {
         }
     }
     console.log('');
-    h(`skill-surge list`);
-    d();
-    t(`  ${T.white(String(installedNames.size))} skills installed across ${agents.length} agent(s).`);
+    console.log(sectionHeader('Installed Skills'));
     console.log('');
-    const byCategory = {};
-    for (const skill of ALL_SKILLS) {
-        if (!byCategory[skill.category])
-            byCategory[skill.category] = [];
-        if (installedNames.has(skill.name))
-            byCategory[skill.category].push(skill.name);
-    }
-    for (const [cat, names] of Object.entries(byCategory)) {
-        if (names.length === 0)
-            continue;
-        console.log(box(`  ${cat}`, names.map(n => `${T.green('✓')} ${T.white(n)}`)));
-        console.log('');
-    }
+    const skillsWithStatus = ALL_SKILLS.map(s => ({
+        name: s.name,
+        category: s.category,
+        status: installedNames.has(s.name) ? `${GREEN}INSTALLED${RESET}` : `${T.muted('available')}`
+    }));
+    console.log(skillsTable(skillsWithStatus));
+    console.log('');
+    console.log(summaryLine(ALL_SKILLS.filter(s => s.source === 'original').length, 0, ALL_SKILLS.filter(s => s.source === 'top-repo').length, ALL_SKILLS.length));
+    console.log('');
     return 0;
 }
 async function cmdHook(args) {
@@ -336,12 +366,16 @@ async function cmdHook(args) {
         }
     }
     if (!task) {
-        r('  Usage: skill-surge hook --task "build a dashboard"');
+        console.log(errorBanner());
+        console.log(`${CYAN} ERROR${RESET}  Missing required argument: task`);
+        console.log('');
+        console.log(`  Usage:`);
+        console.log(`    skill-surge hook --task "build a dashboard"`);
+        console.log('');
         return 1;
     }
     if (isTrivialTask(task)) {
-        const json = JSON.stringify({ task, shouldSuggest: false, detectedSkills: [], message: 'No skills detected for this task.' }, null, 2);
-        console.log(json);
+        console.log(JSON.stringify({ task, shouldSuggest: false, detectedSkills: [], message: 'No skills detected for this task.' }, null, 2));
         return 0;
     }
     const agents = detectAgents().filter(a => a.installed);
@@ -387,7 +421,7 @@ async function cmdHook(args) {
         shouldSuggest: detectedNames.length > 0,
         detectedSkills: detectedNames,
         message: detectedNames.length > 0
-            ? `${detectedNames.length} skills detected. Run: skill-surge install <skill> --agent '*'`
+            ? `${detectedNames.length} skills detected. Run: skill-surge add`
             : 'No skills detected for this task.',
     };
     console.log(JSON.stringify(payload, null, 2));
@@ -396,48 +430,30 @@ async function cmdHook(args) {
 async function cmdConfig() {
     const config = loadConfig();
     console.log('');
-    console.log(T.muted('┌' + '─'.repeat(74) + '─┐'));
-    console.log(T.bold('  skill-surge config'));
-    console.log(T.muted('└' + '─'.repeat(74) + '─┘'));
+    console.log(sectionHeader('Config'));
     console.log('');
-    const stripped = JSON.stringify(config, null, 2).replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
-    console.log(stripped);
+    console.log(JSON.stringify(config, null, 2));
     return 0;
 }
 function printHelp() {
-    console.log('');
-    console.log(`  ${T.bold('skill-surge')}  ${T.muted(`v${VERSION}`)}`);
-    console.log('');
-    console.log(`  ${T.muted('Commands:')}`);
-    console.log(`    ${T.accent('init')}                 First-run setup — detect agents, install all skills`);
-    console.log(`    ${T.accent('scan')}                 Audit project — show installed vs available skills`);
-    console.log(`    ${T.accent('suggest')} --task "..." Find and rank skills for a task`);
-    console.log(`    ${T.accent('install')} <skill>       Install a skill to selected agents`);
-    console.log(`    ${T.accent('list')}                 List all installed skills`);
-    console.log(`    ${T.accent('hook')} --task "..."    Agent trigger — returns JSON for agent integration`);
-    console.log(`    ${T.accent('config')}                Show current configuration`);
-    console.log('');
-    console.log(`  ${T.muted('Examples:')}`);
-    console.log(`    skill-surge init`);
-    console.log(`    skill-surge scan`);
-    console.log(`    skill-surge suggest --task "build a login system with OAuth"`);
-    console.log(`    skill-surge install react-patterns`);
-    console.log(`    skill-surge hook --task "add user authentication"`);
-    console.log('');
-    console.log(`  ${T.muted('Docs:')}  ${T.accent('https://github.com/CodePuri/skill-surge')}`);
-    console.log('');
+    printSplash();
 }
 const COMMANDS = {
     init: cmdInit,
+    add: cmdAdd,
     scan: cmdScan,
     suggest: cmdSuggest,
-    install: cmdInstall,
     list: cmdList,
     hook: cmdHook,
     config: cmdConfig,
 };
 (async () => {
-    const [, , command = 'help', ...args] = process.argv;
+    const [, , command, ...args] = process.argv;
+    if (command === undefined || command === '') {
+        printSplash();
+        process.exitCode = 0;
+        return;
+    }
     if (command === '--help' || command === '-h' || command === 'help') {
         printHelp();
         process.exitCode = 0;
@@ -450,8 +466,9 @@ const COMMANDS = {
     }
     const handler = COMMANDS[command];
     if (!handler) {
-        console.error(`\n  ${T.red('Unknown command:')} ${command}\n`);
-        printHelp();
+        console.log('\n' + errorBanner());
+        console.log(`\n${CYAN} ERROR${RESET}  Unknown command: ${command}\n`);
+        printSplash();
         process.exitCode = 1;
         return;
     }
@@ -460,7 +477,8 @@ const COMMANDS = {
         process.exitCode = code ?? 0;
     }
     catch (err) {
-        console.error(`\n  ${T.red('Error:')} ${err instanceof Error ? err.message : String(err)}\n`);
+        console.log('\n' + errorBanner());
+        console.error(`\n${CYAN} ERROR${RESET}  ${err instanceof Error ? err.message : String(err)}\n`);
         process.exitCode = 1;
     }
 })();

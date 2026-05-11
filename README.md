@@ -1,189 +1,356 @@
-# skill-surge
+![skill-surge — Vaporwave Terminal](https://raw.githubusercontent.com/CodePuri/skill-surge/main/.github/banner.svg)
 
-**Your agent's skill library.** 29 expert-level skills, auto-installed to Claude Code, OpenCode, Cline, and more — in one command.
+<p align="center">
 
-```
-npm install -g skill-surge
-skill-surge init
-```
+![npm version](https://img.shields.io/npm/v/skill-surge?color=%23FF6EC7&label=npm&style=for-the-badge)
+![Node](https://img.shields.io/badge/node-%3E%3D20-00FFFF?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-7B68EE?style=for-the-badge)
+![TypeScript](https://img.shields.io/badge/TypeScript-ES2022-00FFFF?style=for-the-badge)
+![Build](https://img.shields.io/badge/build-passing-39FF14?style=for-the-badge)
 
-That's it. Your agent is now armed with production-grade guidance for every task.
-
----
-
-## What is this?
-
-skill-surge gives your AI agent expert-level knowledge across every domain. It's a curated collection of 29 skills covering workflow, frontend, backend, database, architecture, design, QA, and planning.
-
-**18 skills** come from top [skills.sh](https://skills.sh) repositories (Vercel, Anthropic, Matt Pocock, Supabase) — the same skills used by thousands of production agents. **11 original skills** are opinionated, production-tested guides written specifically for this package.
-
-When your agent loads a skill, it gains the accumulated knowledge and patterns from real-world experts. No more reinventing auth systems, database schemas, or API designs from scratch.
+</p>
 
 ---
 
-## Quick Start
+## █ OVERVIEW
+
+**skill-surge** is a plug-and-play CLI that transforms your AI agent into an expert across every domain. No manual skill hunting. No copy-paste. Just run it and your agent knows more.
+
+It ships with **29 curated skills** covering workflow, frontend, backend, QA, design, architecture, and planning — and auto-discovers hundreds more from [skills.sh](https://skills.sh).
+
+```
+  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+  ▓  npm install -g skill-surge                ▓
+  ▓  skill-surge add                          ▓
+  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+```
+
+---
+
+## ██ QUICK START
 
 ```bash
-# Install the CLI
+# Install globally (one-time)
 npm install -g skill-surge
 
-# One-time setup — detect your agents, install all skills
+# First-run setup — detects environment, registers all skills
 skill-surge init
 
-# See what's installed in your project
+# Interactive skill installation (like skills.sh)
+skill-surge add
+
+# Discover what your agent should know
+skill-surge suggest --task "build a React dashboard with Node.js and PostgreSQL"
+
+# See everything that's available
+skill-surge list
+
+# Audit your project
 skill-surge scan
-
-# Ask for skill recommendations on any task
-skill-surge suggest --task "build a login system with OAuth"
-
-# Hook your agent into skill-surge for automatic skill detection
-skill-surge hook --task "add user authentication"
 ```
 
 ---
 
-## Commands
+## ██ EXAMPLE OUTPUT
 
-| Command | What it does |
-|---------|-------------|
-| `skill-surge init` | Detect agents, choose scope (global/project/both), install all 29 skills |
-| `skill-surge scan` | Audit your project — detect type (React, Node, Python...), show installed vs missing skills |
-| `skill-surge suggest --task "..."` | Find and rank skills for any task. See scores, install counts, and match reasons |
-| `skill-surge install <skill>` | Install a specific skill to selected agents |
-| `skill-surge list` | Show all installed skills grouped by category |
-| `skill-surge hook --task "..."` | JSON output for agent integration — detects relevant skills for a task |
-| `skill-surge config` | Show current configuration |
+### Add (Interactive)
+```
+$ skill-surge add
+
+███████╗██╗  ██╗██╗██╗     ██╗     ███████╗
+██╔════╝██║ ██╔╝██║██║     ██║     ██╔════╝
+███████╗█████╔╝ ██║██║     ██║     ███████╗
+╚════██║██╔═██╗ ██║██║     ██║     ╚════██║
+███████║██║  ██╗██║███████╗███████╗███████║
+╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚══════╝
+
+◇  Source: https://github.com/CodePuri/skill-surge-skills.git
+
+◇  Found 29 skills
+
+◇  Select skills to install (space to toggle)
+  ☑ node-api-design
+  ☑ auth-systems
+  ☑ database-patterns
+  ...
+  
+◇  4 agents
+◇  Which agents do you want to install to?
+  ☑ Claude Code
+  ☑ Cline
+  ☑ OpenCode
+  
+◇  Installation scope
+  Global
+  
+◇  Installation method
+  Symlink (Recommended)
+
+◇  Proceed with installation?
+  Yes
+
+◇  Installation complete
+
+└  Done!  Review skills before use; they run with full agent permissions.
+```
+
+### Suggest
+```
+$ skill-surge suggest --task "react performance testing"
+
+██ Skills Found for: "react performance testing" █
+
+┌─────────────────────────────┬──────────┬─────────────────────────────┐
+│ Skill                       │ Score    │ Reason                      │
+├─────────────────────────────┼──────────┼─────────────────────────────┤
+│ vercel-react-best-practices │ █████████░░ 95 │ 2 intent keyword matches │
+│ react-patterns              │ ████████░░ 80 │ pre-bundled; 1 match      │
+│ testing-strategies          │ ███████░░░ 66 │ 1 intent keyword match   │
+└─────────────────────────────┴──────────┴─────────────────────────────┘
+```
+
+### List
+```
+$ skill-surge list
+
+██ Installed Skills █
+
+┌─────────────────────────────┬────────────────┬──────────────────────┐
+│ Skill                       │ Category       │ Status                │
+├─────────────────────────────┼────────────────┼──────────────────────┤
+│ node-api-design             │ backend        │ INSTALLED             │
+│ auth-systems                │ backend        │ INSTALLED             │
+│ database-patterns           │ database       │ INSTALLED             │
+│ react-patterns              │ frontend       │ INSTALLED             │
+└─────────────────────────────┴────────────────┴──────────────────────┘
+
+▸ 11 bundled  ▸ 18 remote  ▸ Total: 29
+```
+
+### Scan
+```
+$ skill-surge scan
+
+╔════════  SKILL-SURGE DASHBOARD  ═════════╗
+║  Version         2.0.1                    ║
+║  Node            v20.x.x                  ║
+║  Platform        darwin                   ║
+║  Skills Installed 4                       ║
+║  Skills Available 29                      ║
+╚══════════════════════════════════════════╝
+```
 
 ---
 
-## Skills Catalog — 29 Total
+## ██ 29 CURATED SKILLS
 
-### Workflow (9)
-| Skill | Description | Installs |
-|-------|-------------|----------|
-| `find-skills` | Discover skills from skills.sh inside your agent | 1.4M |
-| `grill-me` | Interview yourself relentlessly until requirements are crystal clear | 113K |
-| `tdd` | Red → Green → Refactor loop | 77K |
-| `systematic-debugging` | Hypothesis → test → verify cycle | 89K |
-| `writing-plans` | Structured implementation plans before starting | 89K |
-| `executing-plans` | Step-by-step with checkpoints and verification | 72K |
-| `brainstorming` | Structured ideation and problem decomposition | 149K |
-| `verification-before-completion` | Force a verification pass before marking any task done | 64K |
-| `finishing-a-development-branch` | Branch close checklist: tests, commit, PR, review | 57K |
-| `requesting-code-review` | Prepare code for review: self-review, test coverage, PR description | 78K |
-| `git-workflow` | Standardized Git: branching, conventional commits, PR workflow, hooks | — |
+Every skill ships with real, actionable content — not stubs.
 
-### Frontend (4)
-| Skill | Description | Installs |
-|-------|-------------|----------|
-| `vercel-react-best-practices` | React + Next.js performance optimization with 69 rules | 388K |
-| `next-best-practices` | Next.js App Router conventions, RSC, async APIs, metadata | 82K |
-| `react-patterns` | Hooks, TanStack Query, component patterns, performance | — |
-| `docx` | Generate Word documents programmatically with rich formatting | 83K |
-
-### Design (3)
-| Skill | Description | Installs |
-|-------|-------------|----------|
-| `frontend-design` | Universal frontend design guidelines for any project | 394K |
-| `ui-ux-pro-max` | Visual hierarchy, design systems, expert UI/UX critique | 156K |
-| `accessibility-first` | WCAG 2.1 AA: semantic HTML, ARIA, keyboard nav, screen readers | — |
-
-### Backend (5)
-| Skill | Description | Installs |
-|-------|-------------|----------|
-| `node-api-design` | Production REST API patterns: routing, middleware, validation | — |
-| `auth-systems` | JWT RS256, OAuth2/PKCE, RBAC, bcrypt, session management | — |
-| `error-handling` | Typed error classes, centralized handlers, logging, Sentry | — |
-| `security-hardening` | Helmet, CORS, rate limiting, input sanitization, CSP | — |
-| `deploy-to-vercel` | Environment setup, preview URLs, production deploy, alias management | 47K |
-
-### Database (2)
-| Skill | Description | Installs |
-|-------|-------------|----------|
-| `supabase-postgres-best-practices` | Schema design, RLS, indexing, query performance, migrations | 156K |
-| `database-patterns` | Schema design, indexing, connection pooling, migrations, Redis | — |
-
-### Architecture (1)
-| Skill | Description | Installs |
-|-------|-------------|----------|
-| `system-design` | Scalability, caching, message queues, microservices, observability | — |
-
-### QA (1)
-| Skill | Description | Installs |
-|-------|-------------|----------|
-| `testing-strategies` | Unit, integration, E2E with Playwright, TDD flow, CI coverage | — |
-
-### Planning (1)
-| Skill | Description | Installs |
-|-------|-------------|----------|
-| `project-planning` | Agile planning: user stories, story points, sprints, risk matrix | — |
-
-### Meta (2)
-| Skill | Description | Installs |
-|-------|-------------|----------|
-| `skill-creator` | Create, test, and publish new skills from inside your agent | 197K |
-| `skill-surge` | This package — hook into skill-surge for automatic detection | — |
+| # | Skill | Category | What It Covers | Installs |
+|---|-------|----------|---------------|----------|
+| 1 | `find-skills` | meta | Discover skills from skills.sh | 1.4M |
+| 2 | `grill-me` | workflow | Interview yourself until requirements are clear | 113K |
+| 3 | `tdd` | workflow | Red → Green → Refactor loop | 77K |
+| 4 | `systematic-debugging` | workflow | Hypothesis → test → verify cycle | 89K |
+| 5 | `writing-plans` | workflow | Structured implementation plans | 89K |
+| 6 | `executing-plans` | workflow | Step-by-step with checkpoints | 72K |
+| 7 | `brainstorming` | workflow | Structured ideation | 149K |
+| 8 | `verification-before-completion` | workflow | Force verification before completion | 64K |
+| 9 | `finishing-a-development-branch` | workflow | Branch close checklist | 57K |
+| 10 | `requesting-code-review` | workflow | Prepare code for review | 78K |
+| 11 | `vercel-react-best-practices` | frontend | React + Next.js 69 rules | 388K |
+| 12 | `next-best-practices` | frontend | Next.js App Router | 82K |
+| 13 | `react-patterns` | frontend | Hooks, TanStack Query, performance | — |
+| 14 | `frontend-design` | design | Universal frontend design | 394K |
+| 15 | `ui-ux-pro-max` | design | Visual hierarchy, design systems | 156K |
+| 16 | `accessibility-first` | design | WCAG AA, ARIA, keyboard nav | — |
+| 17 | `node-api-design` | backend | REST, middleware, validation | — |
+| 18 | `auth-systems` | backend | JWT, OAuth2, RBAC, bcrypt | — |
+| 19 | `error-handling` | backend | Typed errors, centralized handlers | — |
+| 20 | `security-hardening` | backend | Helmet, CORS, rate limiting | — |
+| 21 | `deploy-to-vercel` | devops | Preview URLs, production deploy | 47K |
+| 22 | `supabase-postgres-best-practices` | database | Schema, RLS, indexing | 156K |
+| 23 | `database-patterns` | database | Indexing, migrations, Redis | — |
+| 24 | `system-design` | architecture | Scalability, caching, queues | — |
+| 25 | `testing-strategies` | qa | Unit, integration, E2E, Playwright | — |
+| 26 | `project-planning` | planning | Agile, user stories, sprints | — |
+| 27 | `skill-creator` | meta | Create and publish new skills | 197K |
+| 28 | `docx` | docs | Generate Word documents | 83K |
+| 29 | `git-workflow` | workflow | Branching, commits, PRs | — |
 
 ---
 
-## Agent Integration
+## ██ COMMANDS
 
-Add this to your agent's system prompt or config to enable automatic skill detection:
-
-```
-When the user references skill names or starts a prompt with "skill-surge:",
-run: skill-surge hook --task "<task description>"
-Load the detected SKILL.md files from the agent's skills directory.
-```
-
-The `hook` command:
-- Returns **JSON** — safe to parse programmatically
-- Detects **trivial tasks** (hi, hello, ok...) and returns `shouldSuggest: false`
-- Returns **top 5 ranked skills** for real tasks with match reasons
-- Works **offline** — no network required
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `skill-surge` | | Splash screen with ASCII banner |
+| `skill-surge init` | | First-run setup wizard |
+| `skill-surge add` | `[repo]` | Interactive skill installation |
+| `skill-surge scan` | | Project audit with dashboard |
+| `skill-surge suggest` | `--task "..."` `--offline` | Find skills for a task |
+| `skill-surge list` | | Table of installed skills |
+| `skill-surge hook` | `--task "..."` | Agent trigger — returns JSON |
+| `skill-surge config` | | Show current configuration |
+| `skill-surge` | `--help` | Show usage and examples |
+| `skill-surge` | `--version` | Show version number |
 
 ---
 
-## How It Works
+## ██ HOW IT WORKS — THE PIPELINE
 
 ```
-You: "skill-surge: build a login page"
-        ↓
-Agent: skill-surge hook --task "build a login page"
-        ↓
-skill-surge: {
-  "task": "build a login page",
-  "shouldSuggest": true,
-  "detectedSkills": ["auth-systems", "react-patterns"],
-  "message": "2 skills detected."
+                    ┌───────────────────────────────────┐
+                    │  skill-surge add                  │
+                    └──────────────┬────────────────────┘
+                                   │
+           ┌───────────────────────┼───────────────────────┐
+           ▼                       ▼                       ▼
+    ┌─────────────┐         ┌─────────────┐         ┌────────────┐
+    │  BUNDLED    │         │   LOCAL    │         │   REMOTE   │
+    │  skills/    │         │ ~/.agents/  │         │npx skills  │
+    │  29 skills  │         │ (installed)│         │ find       │
+    └──────┬──────┘         └──────┬──────┘         └─────┬──────┘
+           │                     │                        │
+           └─────────────────────┼────────────────────────┘
+                                 ▼
+                    ┌──────────────────────────┐
+                    │  INTERACTIVE UI           │
+                    │  ├── Skill selection     │
+                    │  ├── Agent selection     │
+                    │  ├── Scope selection     │
+                    │  └── Confirmation        │
+                    └────────────┬─────────────┘
+                                 ▼
+                    ┌──────────────────────────┐
+                    │  INSTALL                  │
+                    │  ├── Symlink or Copy     │
+                    │  ├── Global or Project   │
+                    │  └── Per-agent paths     │
+                    └────────────┬─────────────┘
+                                 ▼
+                    ┌──────────────────────────┐
+                    │  SUCCESS                 │
+                    │  └── Summary box         │
+                    └──────────────────────────┘
+```
+
+---
+
+## ██ SCORING MODEL (for suggest/hook)
+
+Every candidate is scored 0–100 based on:
+
+| Factor | Points |
+|--------|--------|
+| Original (bundled) | **40** base |
+| Top-repo | **30** base |
+| Per keyword match | **+20** |
+| Already installed | **+15** |
+| ≥100,000 installs | **+25** |
+| ≥10,000 installs | **+10** |
+
+---
+
+## ██ AGENT INTEGRATION
+
+### For Claude Code, Cline, OpenCode, Cursor
+
+Add this to your agent instructions:
+
+```
+When the user starts a prompt with "skill-surge:" or references skills:
+1. Run: skill-surge hook --task "<task>"
+2. Load the detected SKILL.md files into context
+3. Proceed with the task using skill guidance
+```
+
+### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `SKILL_SURGE_CACHE` | Override cache file path |
+
+---
+
+## ██ CONFIGURATION
+
+Default config: `config/sources.json` in the package
+
+```json
+{
+  "preferredAgents": ["claude-code", "opencode", "cline"],
+  "installMode": "copy",
+  "scope": "global",
+  "trustedOwners": ["vercel-labs", "anthropics", "mattpocock", "obra", "supabase", "codepuri"],
+  "customSources": []
 }
-        ↓
-Agent: loads auth-systems + react-patterns into context
-        ↓
-Agent: builds login page with JWT, OAuth2, React best practices
+```
+
+Override: create `~/.config/skill-surge/sources.json`
+
+---
+
+## ██ DEVELOPMENT
+
+```bash
+# Clone
+git clone git@github.com:CodePuri/skill-surge.git
+cd skill-surge
+
+# Install
+npm install
+
+# Build
+npm run build
+
+# Test
+npm test
+node dist/cli.js init
+node dist/cli.js add
+node dist/cli.js list
+node dist/cli.js suggest --task "react testing"
+node dist/cli.js hook --task "build a dashboard"
 ```
 
 ---
 
-## Supported Agents
+## ██ SUPPORTED AGENTS
 
 Claude Code, OpenCode, Cline, Codex, Cursor, Windsurf, GitHub Copilot, Goose, Roo Code, Augment, Continue.
 
-skill-surge detects which agents you have installed and offers to install skills to all of them — or just one.
+---
+
+## ██ DOCUMENTATION
+
+| Doc | What It Covers |
+|-----|---------------|
+| `docs/HANDOFF.md` | Paths, commands, automation, build/test |
+| `docs/AUTOMATION.md` | Weekly refresh policy, trigger system |
+| `docs/SECURITY.md` | Trust thresholds, safety checklist |
 
 ---
 
-## Terminal UI
+## ██ LINKS
 
-Clean black/grey/white design. No gradients. No neon. Every pixel earns its place.
+<p align="center">
+
+[![npm](https://img.shields.io/badge/npm-skill--surge-FF6EC7?style=for-the-badge)](https://www.npmjs.com/package/skill-surge)
+[![GitHub](https://img.shields.io/badge/GitHub-skill--surge-00FFFF?style=for-the-badge)](https://github.com/CodePuri/skill-surge)
+[![PRs](https://img.shields.io/badge/PRs-welcome-39FF14?style=for-the-badge)](https://github.com/CodePuri/skill-surge/pulls)
+
+</p>
+
+- **npm**: [skill-surge](https://www.npmjs.com/package/skill-surge)
+- **GitHub**: [github.com/CodePuri/skill-surge](https://github.com/CodePuri/skill-surge)
+- **Skills Registry**: [skills.sh](https://skills.sh)
 
 ---
 
-## Requirements
+<p align="center">
 
-- Node.js 20+
-- npm 9+
+**Plug-and-play agent intelligence.** Built with terminal aesthetics by [CodePuri](https://github.com/CodePuri).
 
-## License
+MIT License © 2026
 
-MIT
+</p>

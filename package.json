@@ -1,6 +1,6 @@
 {
   "name": "skill-surge",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Your agent's skill library. 29 curated skills. Auto-install to Claude Code, OpenCode, Cline, and more.",
   "type": "module",
   "bin": {
@@ -22,6 +22,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/CodePuri/skill-surge.git"
+  },
+  "homepage": "https://github.com/CodePuri/skill-surge#readme",
+  "bugs": {
+    "url": "https://github.com/CodePuri/skill-surge/issues"
   },
   "keywords": [
     "ai-skills",
