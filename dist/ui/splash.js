@@ -3,7 +3,7 @@ import boxen from 'boxen';
 import gradient from 'gradient-string';
 const VAPORWAVE = gradient(['#00FFFF', '#FF00FF', '#FF6EC7']);
 export function renderSplash(version) {
-    const logo = figlet.textSync('AUTO SKILLS', { font: 'Standard' });
+    const logo = figlet.textSync('SKILL SURGE', { font: 'Standard' });
     console.log(VAPORWAVE(logo));
     console.log(gradient(['#7B68EE', '#FF6EC7'])(`  Plug-and-play agent intelligence  v${version}`));
     console.log('');
@@ -11,7 +11,7 @@ export function renderSplash(version) {
 export function renderHelp(version) {
     return boxen([
         '',
-        `${gradient(['#00FFFF', '#FF6EC7'])('autoskills')}  ${gradient(['#7B68EE', '#FF6EC7'])('v' + version)}`,
+        `${gradient(['#00FFFF', '#FF6EC7'])('skill-surge')}  ${gradient(['#7B68EE', '#FF6EC7'])('v' + version)}`,
         '',
         '  Commands:',
         `    ${gradient(['#00FFFF', '#39FF14'])('suggest')}   --task "<task>"     Discover & rank skills for a task`,
@@ -33,18 +33,18 @@ export function renderHelp(version) {
         '    -y, --yes          Auto-confirm install (if score is sufficient)',
         '',
         '  Examples:',
-        '    autoskills suggest --task "build a React dashboard"',
-        '    autoskills install <id> -y',
-        '    autoskills doctor',
+        '    skill-surge suggest --task "build a React dashboard"',
+        '    skill-surge install <id> -y',
+        '    skill-surge doctor',
         '',
-        '  Docs:  https://github.com/CodePuri/Auto-skills',
+        '  Docs:  https://github.com/CodePuri/skill-surge',
         '',
     ].join('\n'), {
         padding: { left: 2, right: 2, top: 0, bottom: 0 },
         margin: 0,
         borderStyle: 'double',
         borderColor: 'magenta',
-        title: 'AUTO SKILLS',
+        title: 'SKILL SURGE',
         titleAlignment: 'center',
     });
 }

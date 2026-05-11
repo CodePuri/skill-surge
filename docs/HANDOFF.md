@@ -1,17 +1,16 @@
-# Auto Skills — Project Handoff
+# Skill Surge — Project Handoff
 
 ## Overview
 
-**Project**: Auto Skills (`autoskills`) — plug-and-play agent intelligence CLI
-**Repository**: `git@github.com:CodePuri/Auto-skills.git`
-**Current branch**: `Codex/Autoskills/test`
-**Target**: `main` (via PR)
-**Version**: 1.0.0
+**Project**: Skill Surge (`skill-surge`) — plug-and-play agent intelligence CLI
+**Repository**: `git@github.com:CodePuri/skill-surge.git`
+**Current branch**: `main`
+**Version**: 1.0.1
 
 ## Project Structure
 
 ```
-auto-skills/
+skill-surge/
 ├── src/
 │   ├── cli.ts              # Main entry — command dispatch
 │   ├── types.ts            # TypeScript interfaces (Candidate, Cache, Config, etc.)
@@ -21,7 +20,7 @@ auto-skills/
 │   │   ├── scanner.ts      # SKILL.md discovery (bundle + local)
 │   │   ├── ranker.ts       # Scoring, tokenize, dedup, merge, LLM rerank
 │   │   ├── registrar.ts    # npx skills find + registry queries
-│   │   └── installer.ts    # Safety-gated install execution
+│   │   └── installer.ts     # Safety-gated install execution
 │   └── ui/
 │       ├── splash.ts       # Vaporwave ASCII logo, help menu, printCandidates
 │       ├── box.ts          # boxen wrappers (info/success/warning/error/dashboard)
@@ -46,20 +45,20 @@ auto-skills/
 
 | Command | Description |
 |---------|-------------|
-| `autoskills init` | First-run wizard — registers bundled skills, detects environment |
-| `autoskills doctor` | Health check — Node, cache, paths, connectivity |
-| `autoskills seed` | Register all 14 bundled skills into cache |
-| `autoskills suggest --task "..."` | Full pipeline: scan → score → rank → display |
-| `autoskills suggest --task "..." --json` | JSON output for programmatic/agent use |
-| `autoskills suggest --task "..." --offline` | Cache only, skip remote |
-| `autoskills refresh` | Scan all sources into cache |
-| `autoskills refresh --network` | + inspect remote git sources |
-| `autoskills install <id> [-y]` | Safety-gated install |
-| `autoskills install <id> --dry-run` | Preview without executing |
-| `autoskills hook --task "..." [--json]` | Agent trigger check |
-| `autoskills list` | Table of all cached skills |
-| `autoskills clean` | Clear cache |
-| `autoskills config` | Show current configuration |
+| `skill-surge init` | First-run wizard — registers bundled skills, detects environment |
+| `skill-surge doctor` | Health check — Node, cache, paths, connectivity |
+| `skill-surge seed` | Register all 14 bundled skills into cache |
+| `skill-surge suggest --task "..."` | Full pipeline: scan → score → rank → display |
+| `skill-surge suggest --task "..." --json` | JSON output for programmatic/agent use |
+| `skill-surge suggest --task "..." --offline` | Cache only, skip remote |
+| `skill-surge refresh` | Scan all sources into cache |
+| `skill-surge refresh --network` | + inspect remote git sources |
+| `skill-surge install <id> [-y]` | Safety-gated install |
+| `skill-surge install <id> --dry-run` | Preview without executing |
+| `skill-surge hook --task "..." [--json]` | Agent trigger check |
+| `skill-surge list` | Table of all cached skills |
+| `skill-surge clean` | Clear cache |
+| `skill-surge config` | Show current configuration |
 
 ## Paths & Locations
 
@@ -68,30 +67,30 @@ auto-skills/
 | Repo root | `/Users/totem/Desktop/Code/auto-skills` |
 | CLI binary | `dist/cli.js` (compiled) |
 | Default config | `config/sources.json` |
-| User config override | `~/.config/autoskills/sources.json` |
-| Default cache | `~/.cache/autoskills/index.json` |
-| Init marker | `~/.config/autoskills/.init` |
+| User config override | `~/.config/skill-surge/sources.json` |
+| Default cache | `~/.cache/skill-surge/index.json` |
+| Init marker | `~/.config/skill-surge/.init` |
 | Agent skills | `~/.codex/skills/`, `~/.agents/skills/` |
 
 ## Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
-| `AUTO_SKILLS_CACHE` | Override cache file path |
+| `SKILL_SURGE_CACHE` | Override cache file path |
 | `AUTO_SKILLS_OFFLINE=1` | Force offline mode for all commands |
 | `AUTO_SKILLS_LLM_COMMAND` | External command for LLM-based reranking |
-| `AUTO_SKILLS=true` | Tier-3 trigger — agent runs hook proactively |
+| `SKILL_SURGE=true` | Tier-3 trigger — agent runs hook proactively |
 
 ## Weekly Automation
 
-- **Job name**: `skill-aggregator-weekly-refresh`
+- **Job name**: `skill-surge-weekly-refresh`
 - **Schedule**: Monday 09:00 Asia/Kolkata
 - **Command**: `node dist/cli.js refresh --network`
 - **Policy**: MUST NOT install skills — discovery only
 
 ## Active Skill Location
 
-The active Codex skill is at: `/Users/totem/.codex/skills/auto-skills`
+The active Codex skill is at: `/Users/totem/.codex/skills/skill-surge`
 This points to the `SKILL.md` at the repo root.
 
 ## Build & Test
@@ -116,8 +115,8 @@ node dist/cli.js seed
 
 ```bash
 npm publish --access public
-# Package name: autoskills
-# Bin: autoskills, auto-skills
+# Package name: skill-surge
+# Bin: skill-surge
 ```
 
-After publish: `npm install -g autoskills` → `autoskills suggest --task "..."`
+After publish: `npm install -g skill-surge` → `skill-surge suggest --task "..."`

@@ -63,7 +63,7 @@
   <!-- Top title -->
   <text x="400" y="42" font-family="'Courier New', monospace" font-size="26" font-weight="bold"
         fill="url(#pink)" text-anchor="middle" filter="url(#glow)" letter-spacing="8">
-    AUTO SKILLS
+    SKILL SURGE
   </text>
 
   <!-- Subtitle -->
@@ -86,7 +86,7 @@
         stroke="url(#cyan)" stroke-width="1.5" opacity="0.7"/>
   <text x="400" y="122" font-family="'Courier New', monospace" font-size="14"
         fill="url(#green)" text-anchor="middle" filter="url(#glow)">
-    npm install -g autoskills
+    npm install -g skill-surge
   </text>
 
   <!-- Badges -->

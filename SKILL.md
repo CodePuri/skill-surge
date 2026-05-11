@@ -1,11 +1,11 @@
 ---
-name: auto-skills
-description: Automatically discover, refresh, recommend, and safely install agent skills using the Auto Skills CLI. Pre-seeded with 14 core skills across frontend, backend, QA, design, architecture, and planning. Supports 3-tier trigger system (prefix, config, env).
+name: skill-surge
+description: Automatically discover, refresh, recommend, and safely install agent skills using the Skill Surge CLI. Pre-seeded with 14 core skills across frontend, backend, QA, design, architecture, and planning. Supports 3-tier trigger system (prefix, config, env).
 ---
 
-# Auto Skills
+# Skill Surge
 
-Automatically discover, refresh, recommend, and safely install agent skills using the Auto Skills CLI. Plug-and-play agent intelligence.
+Automatically discover, refresh, recommend, and safely install agent skills using the Skill Surge CLI. Plug-and-play agent intelligence.
 
 ## CLI Entry
 
@@ -13,13 +13,13 @@ The CLI can be invoked in several ways (in order of preference):
 
 ```bash
 # If installed globally
-autoskills <command> [options]
+skill-surge <command> [options]
 
 # Via npx
-npx autoskills <command> [options]
+npx skill-surge <command> [options]
 
 # If the repo is cloned locally
-node /path/to/auto-skills/dist/cli.js <command> [options]
+node /path/to/skill-surge/dist/cli.js <command> [options]
 ```
 
 ## Safety First: Guarded Installation
@@ -40,59 +40,59 @@ node /path/to/auto-skills/dist/cli.js <command> [options]
 
 ```bash
 # Initialize — first-run setup, register bundled skills, check environment
-autoskills init
+skill-surge init
 
 # Health check — diagnostics, Node version, cache status
-autoskills doctor
+skill-surge doctor
 
 # Refresh cache — scan bundled + local skills
-autoskills refresh
-autoskills refresh --network
+skill-surge refresh
+skill-surge refresh --network
 
 # Suggest — find and rank skills for a task
-autoskills suggest --task "react performance testing"
-autoskills suggest --task "react performance testing" --json
-autoskills suggest --task "react performance testing" --offline
+skill-surge suggest --task "react performance testing"
+skill-surge suggest --task "react performance testing" --json
+skill-surge suggest --task "react performance testing" --offline
 
 # Install — safety-gated skill installation
-autoskills install <candidate-id>
-autoskills install <candidate-id> -y
-autoskills install <candidate-id> --dry-run
+skill-surge install <candidate-id>
+skill-surge install <candidate-id> -y
+skill-surge install <candidate-id> --dry-run
 
 # Hook — agent trigger check (returns JSON)
-autoskills hook --task "build a polished dashboard UI" --json
+skill-surge hook --task "build a polished dashboard UI" --json
 
 # List all cached/bundled skills
-autoskills list
+skill-surge list
 
 # Seed — register all bundled skills into cache
-autoskills seed
+skill-surge seed
 
 # Clear cache
-autoskills clean
+skill-surge clean
 
 # Show configuration
-autoskills config
+skill-surge config
 ```
 
 ## Three-Tier Trigger System
 
 ### Tier 1: Prompt Prefix
-When the user starts a prompt with `auto skills:`, immediately:
+When the user starts a prompt with `skill-surge:`, immediately:
 1. Extract the task after the colon
-2. Run: `autoskills hook --task "<task>" --json`
+2. Run: `skill-surge hook --task "<task>" --json`
 3. Present the top candidates to the user
 4. If the user approves, install high-confidence candidates
 
 ### Tier 2: Config File
-If `~/.config/autoskills/trigger.json` exists with `alwaysSuggest: true`, run `autoskills hook` on every substantial prompt.
+If `~/.config/skill-surge/trigger.json` exists with `alwaysSuggest: true`, run `skill-surge hook` on every substantial prompt.
 
 ### Tier 3: Environment Variable
-If `AUTO_SKILLS=true` is set, run `autoskills hook` proactively on substantial tasks.
+If `SKILL_SURGE=true` is set, run `skill-surge hook` proactively on substantial tasks.
 
 ## Pre-Bundled Skills
 
-Auto Skills ships with 14 curated skills in these categories:
+Skill Surge ships with 14 curated skills in these categories:
 
 - **Frontend**: react-patterns, css-mastery, tailwind-architecture
 - **Backend**: node-api-design, database-patterns, auth-systems
@@ -120,5 +120,5 @@ Auto-install requires score ≥ 70 AND (trusted owner OR ≥1000 installs).
 
 ## Source Repository
 
-- **Remote Source**: `git@github.com:CodePuri/Auto-skills.git`
-- **npm Package**: `autoskills`
+- **Remote Source**: `git@github.com:CodePuri/skill-surge.git`
+- **npm Package**: `skill-surge`

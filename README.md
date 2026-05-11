@@ -1,8 +1,8 @@
-![Auto Skills — Vaporwave Terminal](https://raw.githubusercontent.com/CodePuri/Auto-skills/main/.github/banner.svg)
+![Skill Surge — Vaporwave Terminal](https://raw.githubusercontent.com/CodePuri/skill-surge/main/.github/banner.svg)
 
 <p align="center">
 
-![npm version](https://img.shields.io/npm/v/autoskills?color=%23FF6EC7&label=npm&style=for-the-badge)
+![npm version](https://img.shields.io/npm/v/skill-surge?color=%23FF6EC7&label=npm&style=for-the-badge)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-00FFFF?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-7B68EE?style=for-the-badge)
 ![TypeScript](https://img.shields.io/badge/TypeScript-ES2022-00FFFF?style=for-the-badge)
@@ -14,14 +14,14 @@
 
 ## █ OVERVIEW
 
-**Auto Skills** is a plug-and-play CLI that transforms your AI agent into an expert across every domain. No manual skill hunting. No copy-paste. Just run it and your agent knows more.
+**Skill Surge** is a plug-and-play CLI that transforms your AI agent into an expert across every domain. No manual skill hunting. No copy-paste. Just run it and your agent knows more.
 
 It ships with **14 pre-bundled skills** covering frontend, backend, QA, design, architecture, and planning — and auto-discovers hundreds more from [skills.sh](https://skills.sh) and [skillsmp.com](https://skillsmp.com).
 
 ```
   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-  ▓  npm install -g autoskills                  ▓
-  ▓  autoskills suggest --task "your task"     ▓
+  ▓  npm install -g skill-surge                  ▓
+  ▓  npx skill-surge suggest --task "your task"     ▓
   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 ```
 
@@ -31,19 +31,19 @@ It ships with **14 pre-bundled skills** covering frontend, backend, QA, design, 
 
 ```bash
 # Install globally (one-time)
-npm install -g autoskills
+npm install -g skill-surge
 
 # First-run setup — detects environment, registers all skills
-autoskills init
+npx skill-surge init
 
 # Discover what your agent should know
-autoskills suggest --task "build a React dashboard with Node.js and PostgreSQL"
+npx skill-surge suggest --task "build a React dashboard with Node.js and PostgreSQL"
 
 # See everything that's available
-autoskills list
+npx skill-surge list
 
 # Health check
-autoskills doctor
+npx skill-surge doctor
 ```
 
 ---
@@ -52,7 +52,7 @@ autoskills doctor
 
 ### Suggest
 ```
-$ autoskills suggest --task "react performance testing" --offline
+$ npx skill-surge suggest --task "react performance testing" --offline
 
      _   _   _ _____ ___    ____  _  _____ _     _     ____
     / \ | | | |_   _/ _ \  / ___|| |/ /_ _| |   | |   / ___|
@@ -77,7 +77,7 @@ $ autoskills suggest --task "react performance testing" --offline
 
 ### List
 ```
-$ autoskills list
+$ npx skill-surge list
 
 ┌──────────────────────────┬──────────┬──────────────┬────────────────────────┐
 │ Skill                    │ Score    │ Status       │ Trust                  │
@@ -95,7 +95,7 @@ $ autoskills list
 
 ### Doctor
 ```
-$ autoskills doctor
+$ npx skill-surge doctor
 
 ╔════════  AUTO SKILLS DASHBOARD  ═════════╗
 ║  Version         1.0.0                    ║
@@ -139,19 +139,19 @@ Every skill ships with real, actionable content — not stubs.
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `autoskills` | | Splash screen + full help menu |
-| `autoskills init` | | First-run setup wizard |
-| `autoskills doctor` | | System health check |
-| `autoskills seed` | | Register all 14 bundled skills into cache |
-| `autoskills suggest` | `--task "..."` `--json` `--offline` `--llm` | Discover, score, rank, and display skills |
-| `autoskills refresh` | `[--network]` `[--dry-run]` | Scan all sources and update cache |
-| `autoskills install` | `<id>` `[-y]` `[--dry-run]` | Safety-gated skill installation |
-| `autoskills hook` | `--task "..."` `[--json]` | Agent trigger check — returns JSON |
-| `autoskills list` | `[--json]` | Formatted table of all cached skills |
-| `autoskills clean` | | Clear all cached data |
-| `autoskills config` | | Show current configuration |
-| `autoskills` | `--help` | Show usage and examples |
-| `autoskills` | `--version` | Show version number |
+| `skill-surge` | | Splash screen + full help menu |
+| `npx skill-surge init` | | First-run setup wizard |
+| `npx skill-surge doctor` | | System health check |
+| `npx skill-surge seed` | | Register all 14 bundled skills into cache |
+| `npx skill-surge suggest` | `--task "..."` `--json` `--offline` `--llm` | Discover, score, rank, and display skills |
+| `npx skill-surge refresh` | `[--network]` `[--dry-run]` | Scan all sources and update cache |
+| `npx skill-surge install` | `<id>` `[-y]` `[--dry-run]` | Safety-gated skill installation |
+| `npx skill-surge hook` | `--task "..."` `[--json]` | Agent trigger check — returns JSON |
+| `npx skill-surge list` | `[--json]` | Formatted table of all cached skills |
+| `npx skill-surge clean` | | Clear all cached data |
+| `npx skill-surge config` | | Show current configuration |
+| `skill-surge` | `--help` | Show usage and examples |
+| `skill-surge` | `--version` | Show version number |
 
 ---
 
@@ -159,7 +159,7 @@ Every skill ships with real, actionable content — not stubs.
 
 ```
                     ┌───────────────────────────────────┐
-                    │  autoskills suggest --task "..."  │
+                     │  skill-surge suggest --task "..."  │
                     └──────────────┬────────────────────┘
                                    │
            ┌───────────────────────┼───────────────────────┐
@@ -228,29 +228,29 @@ Every candidate is scored 0–100 based on:
 
 **Install flow:**
 ```
-autoskills install <id>         → BLOCKED (needs -y)
-autoskills install <id> -y     → BLOCKED (score too low or unknown source)
-autoskills install <id> -y     → PASSES threshold → INSTALLED
+npx skill-surge install <id>         → BLOCKED (needs -y)
+npx skill-surge install <id> -y     → BLOCKED (score too low or unknown source)
+npx skill-surge install <id> -y     → PASSES threshold → INSTALLED
 ```
 
 ---
 
 ## ██ TRIGGER SYSTEM — 3 TIERS
 
-Start your prompt with `auto skills:` and your agent auto-discovers relevant skills.
+Start your prompt with `skill-surge:` and your agent auto-discovers relevant skills.
 
 ```
-USER: auto skills: build a fullstack dashboard with React, Node, and PostgreSQL
+USER: skill-surge: build a fullstack dashboard with React, Node, and PostgreSQL
 
-AGENT: ✓ Detected "auto skills:" prefix
-       ✓ Running autoskills hook --task "build a fullstack..."
+AGENT: ✓ Detected "skill-surge:" prefix
+       ✓ Running skill-surge hook --task "build a fullstack..."
        ✓ Found: react-patterns, node-api-design, database-patterns, system-design
        ✓ Frontloading 4 skills into context
        → Building the dashboard...
 ```
 
-**Tier 1 — Prefix** (zero config): `auto skills: ...`
-**Tier 2 — Config** (`~/.config/autoskills/trigger.json`): `{ "alwaysSuggest": true }`
+**Tier 1 — Prefix** (zero config): `skill-surge: ...`
+**Tier 2 — Config** (`~/.config/skill-surge/trigger.json`): `{ "alwaysSuggest": true }`
 **Tier 3 — Env** (`export AUTO_SKILLS=true`)
 
 ---
@@ -262,22 +262,22 @@ AGENT: ✓ Detected "auto skills:" prefix
 Add this to your agent instructions:
 
 ```
-When the user starts a prompt with "auto skills:", immediately:
+When the user starts a prompt with "skill-surge:", immediately:
 1. Extract the task after the colon
-2. Run: autoskills hook --task "<task>" --json
+2. Run: skill-surge hook --task "<task>" --json
 3. Present the top candidates (score ≥ 70)
-4. If approved: autoskills install <id> -y
+4. If approved: skill-surge install <id> -y
 5. Load the skill file(s) into context before working
 
-When the user starts a prompt with "auto skills:", immediately run:
-  autoskills hook --task "..." --json
+When the user starts a prompt with "skill-surge:", immediately run:
+  skill-surge hook --task "..." --json
 
 Available commands:
-  autoskills init       # First-run setup
-  autoskills doctor     # Health check
-  autoskills seed       # Register 14 bundled skills
-  autoskills list       # Show all cached skills
-  autoskills clean      # Clear cache
+  skill-surge init       # First-run setup
+  skill-surge doctor     # Health check
+  skill-surge seed       # Register 14 bundled skills
+  skill-surge list       # Show all cached skills
+  skill-surge clean      # Clear cache
 ```
 
 ### Environment variables
@@ -304,7 +304,7 @@ Default config: `config/sources.json` in the package
 }
 ```
 
-Override: create `~/.config/autoskills/sources.json`
+Override: create `~/.config/skill-surge/sources.json`
 
 ---
 
@@ -312,7 +312,7 @@ Override: create `~/.config/autoskills/sources.json`
 
 ```bash
 # Clone
-git clone git@github.com:CodePuri/Auto-skills.git
+git clone git@github.com:CodePuri/skill-surge.git
 cd Auto-skills
 
 # Install
@@ -371,8 +371,8 @@ node dist/cli.js refresh --network
 ```
 
 - **Discovers only** — never installs anything
-- Writes updated cache to `~/.cache/autoskills/index.json`
-- Logs output to `~/.logs/autoskills-refresh.log`
+- Writes updated cache to `~/.cache/skill-surge/index.json`
+- Logs output to `~/.logs/skill-surge-refresh.log`
 
 See `docs/AUTOMATION.md` for cron setup, monitoring, and recovery.
 
@@ -392,14 +392,14 @@ See `docs/AUTOMATION.md` for cron setup, monitoring, and recovery.
 
 <p align="center">
 
-[![npm](https://img.shields.io/badge/npm-autoskills-FF6EC7?style=for-the-badge)](https://www.npmjs.com/package/autoskills)
-[![GitHub](https://img.shields.io/badge/GitHub-Auto--Skills-00FFFF?style=for-the-badge)](https://github.com/CodePuri/Auto-skills)
-[![PRs](https://img.shields.io/badge/PRs-welcome-39FF14?style=for-the-badge)](https://github.com/CodePuri/Auto-skills/pulls)
+[![npm](https://img.shields.io/badge/npm-skill-surge-FF6EC7?style=for-the-badge)](https://www.npmjs.com/package/skill-surge)
+[![GitHub](https://img.shields.io/badge/GitHub-Auto--Skills-00FFFF?style=for-the-badge)](https://github.com/CodePuri/skill-surge)
+[![PRs](https://img.shields.io/badge/PRs-welcome-39FF14?style=for-the-badge)](https://github.com/CodePuri/skill-surge/pulls)
 
 </p>
 
-- **npm**: [autoskills](https://www.npmjs.com/package/autoskills)
-- **GitHub**: [github.com/CodePuri/Auto-skills](https://github.com/CodePuri/Auto-skills)
+- **npm**: [skill-surge](https://www.npmjs.com/package/skill-surge)
+- **GitHub**: [github.com/CodePuri/skill-surge](https://github.com/CodePuri/skill-surge)
 - **Skills Registry**: [skills.sh](https://skills.sh)
 - **Skills Marketplace**: [skillsmp.com](https://skillsmp.com)
 
@@ -407,7 +407,7 @@ See `docs/AUTOMATION.md` for cron setup, monitoring, and recovery.
 
 <p align="center">
 
-![Banner](https://raw.githubusercontent.com/CodePuri/Auto-skills/main/.github/banner.svg)
+![Banner](https://raw.githubusercontent.com/CodePuri/skill-surge/main/.github/banner.svg)
 
 **Plug-and-play agent intelligence.** Built with vaporwave aesthetics by [CodePuri](https://github.com/CodePuri).
 

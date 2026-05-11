@@ -131,14 +131,14 @@ async function commandInit(): Promise<number> {
   const readyMsg = gradient(['#39FF14', '#00FFFF'])(
     '\n  ✓ AUTO SKILLS READY\n' +
     '  \n' +
-    '  Run:  autoskills suggest --task "your task"\n' +
-    '  Or:   Start any prompt with: auto skills: <your request>\n',
+    '  Run:  skill-surge suggest --task "your task"\n' +
+    '  Or:   Start any prompt with: skill-surge: <your request>\n',
   );
   console.log(successBox(' READY ', readyMsg));
   console.log('');
 
   // Write init marker
-  const initPath = path.join(home, '.config', 'autoskills');
+  const initPath = path.join(home, '.config', 'skill-surge');
   fs.mkdirSync(initPath, { recursive: true });
   fs.writeFileSync(
     path.join(initPath, '.init'),
@@ -175,7 +175,7 @@ function commandDoctor(): number {
   entries.push({ label: 'Codex Skills Dir', value: codexSkills ? '✓ exists' : '— missing' });
   entries.push({ label: 'Agent Skills Dir', value: agentsSkills ? '✓ exists' : '— missing' });
 
-  const initDone = fs.existsSync(path.join(home, '.config', 'autoskills', '.init'));
+  const initDone = fs.existsSync(path.join(home, '.config', 'skill-surge', '.init'));
   entries.push({ label: 'First-Run Complete', value: initDone ? '✓ yes' : '— not yet' });
 
   console.log(dashboardBox(entries) + '\n');
@@ -193,7 +193,7 @@ function commandDoctor(): number {
   if (allGood) {
     console.log(successBox(' PASS ', '\n  All systems operational.\n') + '\n');
   } else {
-    console.log(warningBox(' WARN ', '\n  Some checks did not pass. Run: autoskills init\n') + '\n');
+    console.log(warningBox(' WARN ', '\n  Some checks did not pass. Run: skill-surge init\n') + '\n');
   }
 
   return allGood ? 0 : 1;
@@ -327,7 +327,7 @@ function commandSuggest(flags: Flags): number {
       console.log('\n' + successBox(
         ' AUTO-INSTALL READY ',
         `\n  ${autoInstall.length} candidate(s) pass the trust threshold.\n` +
-        '  Run: autoskills install <id> [-y] to install.\n',
+        '  Run: skill-surge install <id> [-y] to install.\n',
       ) + '\n');
     }
   }
@@ -418,7 +418,7 @@ function commandList(flags: Flags): number {
   const cache = loadCache();
 
   if (cache.candidates.length === 0) {
-    console.log(warningBox(' EMPTY ', '\n  No skills cached. Run: autoskills refresh\n'));
+    console.log(warningBox(' EMPTY ', '\n  No skills cached. Run: skill-surge refresh\n'));
     return 0;
   }
 

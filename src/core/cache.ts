@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Cache } from '../types.js';
 
-const DEFAULT_CACHE_PATH = path.join(os.homedir(), '.cache', 'autoskills', 'index.json');
-const FALLBACK_CACHE_PATH = path.join(os.tmpdir(), 'autoskills', 'index.json');
+const DEFAULT_CACHE_PATH = path.join(os.homedir(), '.cache', 'skill-surge', 'index.json');
+const FALLBACK_CACHE_PATH = path.join(os.tmpdir(), 'skill-surge', 'index.json');
 
 function cachePath(): string {
   return process.env.AUTO_SKILLS_CACHE || DEFAULT_CACHE_PATH;

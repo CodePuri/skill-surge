@@ -1,11 +1,10 @@
 {
-  "name": "autoskills",
-  "version": "1.0.0",
+  "name": "skill-surge",
+  "version": "1.0.1",
   "description": "Plug-and-play agent intelligence. Pre-seeded with 14 core skills across frontend, backend, QA, design, architecture, and planning. Auto-discovers and installs skills from skills.sh, skillsmp.com, and community registries.",
   "type": "module",
   "bin": {
-    "autoskills": "./dist/cli.js",
-    "auto-skills": "./dist/cli.js"
+    "skill-surge": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -20,6 +19,10 @@
     "SKILL.md",
     "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CodePuri/skill-surge.git"
+  },
   "keywords": [
     "ai-skills",
     "agent",

@@ -83,7 +83,7 @@ function candidateFromSkill(filePath, sourceKind) {
         lastSeenAt: new Date().toISOString(),
         score: 0,
         canAutoInstall: false,
-        reason: sourceKind === 'bundled' ? 'Pre-bundled skill shipped with autoskills.' : 'Installed local skill.',
+        reason: sourceKind === 'bundled' ? 'Pre-bundled skill shipped with skill-surge.' : 'Installed local skill.',
         category: metadata.category || undefined,
     };
 }

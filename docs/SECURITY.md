@@ -1,4 +1,4 @@
-# Auto Skills — Security Policy
+# Skill Surge — Security Policy
 
 ## Core Safety Principle
 
@@ -110,7 +110,7 @@ Before any new feature or refactor, verify:
 
 ## Reporting Security Issues
 
-If you discover a security vulnerability in Auto Skills:
+If you discover a security vulnerability in Skill Surge:
 1. Do NOT open a public GitHub issue
 2. Contact the maintainer directly
 3. Allow 48 hours for initial response

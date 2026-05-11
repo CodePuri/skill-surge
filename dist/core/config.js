@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const DEFAULT_CONFIG_PATH = path.join(REPO_ROOT, 'config', 'sources.json');
-const USER_CONFIG_PATH = path.join(os.homedir(), '.config', 'autoskills', 'sources.json');
+const USER_CONFIG_PATH = path.join(os.homedir(), '.config', 'skill-surge', 'sources.json');
 function readJson(filePath, fallback) {
     try {
         return JSON.parse(fs.readFileSync(filePath, 'utf8'));
