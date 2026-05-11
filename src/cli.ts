@@ -5,21 +5,15 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Agent, ScoredCandidate, ScanResult } from './types.js';
-import { detectAgents, detectInstalledAgents, resolveAgentPath } from './core/agent.js';
-import { loadConfig } from './core/config.js';
-import { loadCache, saveCache, configPath } from './core/cache.js';
-import { auditProject } from './core/auditor.js';
-import { runSkillsFind, rankSkillsForTask } from './core/registrar.js';
-import { installSkillToAgents, installTopRepoSkills } from './core/installer.js';
-import { isTrivialTask } from './core/ranker.js';
-import { ALL_SKILLS, getSkillByName } from './core/catalog.js';
+import { detectAgents, detectInstalledAgents, resolveAgentPath, auditProject, loadConfig, loadCache, saveCache, userConfigPath, installSkillToAgents, installTopRepoSkills } from './install.js';
+import { ALL_SKILLS, getSkillByName, isTrivialTask, rankSkillsForTask, runSkillsFind } from './search.js';
 import { T, box, divider, header, C } from './ui/terminal.js';
-import { ask, confirm, select, interactiveMultiSelect, confirmWithPrompt } from './ui/prompt.js';
+import { select, interactiveMultiSelect, confirmWithPrompt } from './ui/prompt.js';
 import { logo, errorBanner, successBanner, sectionHeader, infoBox, progressBox, installSummary, securityTable, installComplete, promptBox, divider as bannerDivider } from './ui/banner.js';
 import { skillsTable, candidateTable, installedTable, summaryLine, dashboardBox } from './ui/table.js';
 import { startSpinner, stopSpinner, stopSpinnerWithSuccess, stopSpinnerWithError } from './ui/spinner.js';
 
-const VERSION = '2.1.1';
+const VERSION = '2.2.0';
 const CYAN = C.brightCyan;
 const GREEN = C.brightGreen;
 const WHITE = C.white;
@@ -284,6 +278,26 @@ async function cmdScan() {
     console.log('');
   }
 
+  const projType = result.projectType[0] || '';
+  const recMap: Record<string, string[]> = {
+    'React': ['react-patterns', 'vercel-react-best-practices'],
+    'Next.js': ['next-best-practices', 'vercel-react-best-practices'],
+    'Express': ['node-api-design', 'error-handling'],
+    'Supabase': ['supabase-postgres-best-practices', 'database-patterns'],
+    'Node.js': ['node-api-design', 'error-handling', 'testing-strategies'],
+  };
+  const recs = recMap[projType] || [];
+  const uninstalledRecs = recs.filter(r => !result.installed.some(i => i.name === r));
+
+  if (uninstalledRecs.length > 0) {
+    console.log(infoBox('  Recommended for this project', uninstalledRecs.map(r => 
+      `${T.muted('○')} ${r}`
+    )));
+    console.log('');
+    t(`  ${T.muted('Install:')} skill-surge add  (select recommended skills)`);
+    console.log('');
+  }
+
   t(`  ${T.muted('Quick action:')} skill-surge suggest --task "..."  or  skill-surge add`);
   console.log('');
 
@@ -359,49 +373,57 @@ async function cmdSuggest(args: string[]) {
 
 async function cmdList() {
   const agents = detectAgents().filter(a => a.installed);
-  const allPaths = [
-    ...agents.map(a => resolveAgentPath(a, 'global')),
-    ...agents.map(a => resolveAgentPath(a, 'project')),
-  ];
-  const installedNames = new Set<string>();
 
-  for (const gp of allPaths) {
-    if (fs.existsSync(gp)) {
+  const skillAgentMap = new Map<string, string[]>();
+  for (const agent of agents) {
+    for (const scope of ['global', 'project'] as const) {
+      const dir = resolveAgentPath(agent, scope);
+      if (!fs.existsSync(dir)) continue;
       try {
-        for (const f of fs.readdirSync(gp)) {
-          if (f.endsWith('.md')) {
-            let name = f.replace(/\.md$/, '');
-            try {
-              const c = fs.readFileSync(path.join(gp, f), 'utf8');
-              if (c.startsWith('---')) {
-                const end = c.indexOf('\n---', 3);
-                if (end > 0) {
-                  for (const line of c.slice(3, end).split('\n')) {
-                    const m2 = line.match(/^name:\s*(.+)$/);
-                    if (m2) { name = m2[1].trim(); break; }
-                  }
+        for (const f of fs.readdirSync(dir)) {
+          if (!f.endsWith('.md')) continue;
+          let name = f.replace(/\.md$/, '');
+          try {
+            const c = fs.readFileSync(path.join(dir, f), 'utf8');
+            if (c.startsWith('---')) {
+              const end = c.indexOf('\n---', 3);
+              if (end > 0) {
+                for (const line of c.slice(3, end).split('\n')) {
+                  const m2 = line.match(/^name:\s*(.+)$/);
+                  if (m2) { name = m2[1].trim(); break; }
                 }
               }
-            } catch { /* use filename */ }
-            installedNames.add(name);
-          }
+            }
+          } catch {}
+          const list = skillAgentMap.get(name) || [];
+          if (!list.includes(agent.name)) list.push(agent.name);
+          skillAgentMap.set(name, list);
         }
-      } catch { /* ignore */ }
+      } catch {}
     }
   }
 
+  const categories = [...new Set(ALL_SKILLS.map(s => s.category))];
+  const order = ['workflow', 'design', 'frontend', 'backend', 'database', 'security', 'devops', 'docs', 'qa', 'architecture', 'planning', 'meta'];
+  const sorted = order.filter(c => categories.includes(c));
+
   console.log('');
-  console.log(sectionHeader('Installed Skills'));
+  console.log(sectionHeader('skill-surge Skills'));
   console.log('');
 
-  const skillsWithStatus = ALL_SKILLS.map(s => ({
-    name: s.name,
-    category: s.category,
-    status: installedNames.has(s.name) ? `${GREEN}INSTALLED${RESET}` : `${T.muted('available')}`
-  }));
-  
-  console.log(skillsTable(skillsWithStatus));
-  console.log('');
+  for (const cat of sorted) {
+    const skills = ALL_SKILLS.filter(s => s.category === cat);
+    console.log(`  ${CYAN}━━━ ${cat.toUpperCase()} (${skills.length}) ━━━${RESET}`);
+    console.log('');
+    for (const s of skills) {
+      const agents = skillAgentMap.get(s.name);
+      const icon = agents ? `${GREEN}●${RESET}` : ` ${T.muted('○')}`;
+      const info = agents ? agents.join(', ') : `${T.muted('available')}`;
+      console.log(`  ${icon} ${s.name.padEnd(30)} ${info}`);
+    }
+    console.log('');
+  }
+
   console.log(summaryLine(
     ALL_SKILLS.filter(s => s.source === 'original').length,
     0,

@@ -1,19 +1,14 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { detectAgents, resolveAgentPath } from './core/agent.js';
-import { loadConfig } from './core/config.js';
-import { auditProject } from './core/auditor.js';
-import { rankSkillsForTask } from './core/registrar.js';
-import { installSkillToAgents, installTopRepoSkills } from './core/installer.js';
-import { isTrivialTask } from './core/ranker.js';
-import { ALL_SKILLS } from './core/catalog.js';
+import { detectAgents, resolveAgentPath, auditProject, loadConfig, installSkillToAgents, installTopRepoSkills } from './install.js';
+import { ALL_SKILLS, isTrivialTask, rankSkillsForTask } from './search.js';
 import { T, divider, header, C } from './ui/terminal.js';
 import { select, interactiveMultiSelect, confirmWithPrompt } from './ui/prompt.js';
 import { logo, errorBanner, successBanner, sectionHeader, infoBox, installSummary, securityTable, installComplete } from './ui/banner.js';
-import { skillsTable, candidateTable, summaryLine, dashboardBox } from './ui/table.js';
+import { candidateTable, summaryLine, dashboardBox } from './ui/table.js';
 import { startSpinner, stopSpinner } from './ui/spinner.js';
-const VERSION = '2.0.1';
+const VERSION = '2.2.0';
 const CYAN = C.brightCyan;
 const GREEN = C.brightGreen;
 const WHITE = C.white;
@@ -22,7 +17,7 @@ function t(msg) { console.log(T.text(msg)); }
 function m(msg) { console.log(T.muted(msg)); }
 function g(msg) { console.log(T.green(msg)); }
 function r(msg) { console.log(T.red(msg)); }
-function a(msg) { console.log(T.accent(msg)); }
+function a(msg) { return T.accent(msg); }
 function b(msg) { console.log(T.bold(msg)); }
 function d() { console.log(divider()); }
 function h(msg) { console.log(header(msg)); }
@@ -38,7 +33,7 @@ function printSplash() {
     console.log(`  ${CYAN}▸${RESET} skill-surge suggest    Find skills for a task`);
     console.log(`  ${CYAN}▸${RESET} skill-surge hook       Agent trigger (JSON)`);
     console.log('');
-    console.log(`  Docs: ${a('https://github.com/CodePuri/skill-surge')}`);
+    console.log('  Docs: ' + a('https://github.com/CodePuri/skill-surge'));
     console.log('');
 }
 async function cmdAdd(args) {
@@ -229,6 +224,22 @@ async function cmdScan() {
         console.log(infoBox('  Installed Skills', result.installed.slice(0, 10).map(s => `${GREEN}✓${RESET} ${s.name}  ${T.muted('in ' + s.agent)}`)));
         console.log('');
     }
+    const projType = result.projectType[0] || '';
+    const recMap = {
+        'React': ['react-patterns', 'vercel-react-best-practices'],
+        'Next.js': ['next-best-practices', 'vercel-react-best-practices'],
+        'Express': ['node-api-design', 'error-handling'],
+        'Supabase': ['supabase-postgres-best-practices', 'database-patterns'],
+        'Node.js': ['node-api-design', 'error-handling', 'testing-strategies'],
+    };
+    const recs = recMap[projType] || [];
+    const uninstalledRecs = recs.filter(r => !result.installed.some(i => i.name === r));
+    if (uninstalledRecs.length > 0) {
+        console.log(infoBox('  Recommended for this project', uninstalledRecs.map(r => `${T.muted('○')} ${r}`)));
+        console.log('');
+        t(`  ${T.muted('Install:')} skill-surge add  (select recommended skills)`);
+        console.log('');
+    }
     t(`  ${T.muted('Quick action:')} skill-surge suggest --task "..."  or  skill-surge add`);
     console.log('');
     return 0;
@@ -303,50 +314,60 @@ async function cmdSuggest(args) {
 }
 async function cmdList() {
     const agents = detectAgents().filter(a => a.installed);
-    const allPaths = [
-        ...agents.map(a => resolveAgentPath(a, 'global')),
-        ...agents.map(a => resolveAgentPath(a, 'project')),
-    ];
-    const installedNames = new Set();
-    for (const gp of allPaths) {
-        if (fs.existsSync(gp)) {
+    const skillAgentMap = new Map();
+    for (const agent of agents) {
+        for (const scope of ['global', 'project']) {
+            const dir = resolveAgentPath(agent, scope);
+            if (!fs.existsSync(dir))
+                continue;
             try {
-                for (const f of fs.readdirSync(gp)) {
-                    if (f.endsWith('.md')) {
-                        let name = f.replace(/\.md$/, '');
-                        try {
-                            const c = fs.readFileSync(path.join(gp, f), 'utf8');
-                            if (c.startsWith('---')) {
-                                const end = c.indexOf('\n---', 3);
-                                if (end > 0) {
-                                    for (const line of c.slice(3, end).split('\n')) {
-                                        const m2 = line.match(/^name:\s*(.+)$/);
-                                        if (m2) {
-                                            name = m2[1].trim();
-                                            break;
-                                        }
+                for (const f of fs.readdirSync(dir)) {
+                    if (!f.endsWith('.md'))
+                        continue;
+                    let name = f.replace(/\.md$/, '');
+                    try {
+                        const c = fs.readFileSync(path.join(dir, f), 'utf8');
+                        if (c.startsWith('---')) {
+                            const end = c.indexOf('\n---', 3);
+                            if (end > 0) {
+                                for (const line of c.slice(3, end).split('\n')) {
+                                    const m2 = line.match(/^name:\s*(.+)$/);
+                                    if (m2) {
+                                        name = m2[1].trim();
+                                        break;
                                     }
                                 }
                             }
                         }
-                        catch { /* use filename */ }
-                        installedNames.add(name);
                     }
+                    catch { }
+                    const list = skillAgentMap.get(name) || [];
+                    if (!list.includes(agent.name))
+                        list.push(agent.name);
+                    skillAgentMap.set(name, list);
                 }
             }
-            catch { /* ignore */ }
+            catch { }
         }
     }
+    const categories = [...new Set(ALL_SKILLS.map(s => s.category))];
+    const order = ['workflow', 'design', 'frontend', 'backend', 'database', 'security', 'devops', 'docs', 'qa', 'architecture', 'planning', 'meta'];
+    const sorted = order.filter(c => categories.includes(c));
     console.log('');
-    console.log(sectionHeader('Installed Skills'));
+    console.log(sectionHeader('skill-surge Skills'));
     console.log('');
-    const skillsWithStatus = ALL_SKILLS.map(s => ({
-        name: s.name,
-        category: s.category,
-        status: installedNames.has(s.name) ? `${GREEN}INSTALLED${RESET}` : `${T.muted('available')}`
-    }));
-    console.log(skillsTable(skillsWithStatus));
-    console.log('');
+    for (const cat of sorted) {
+        const skills = ALL_SKILLS.filter(s => s.category === cat);
+        console.log(`  ${CYAN}━━━ ${cat.toUpperCase()} (${skills.length}) ━━━${RESET}`);
+        console.log('');
+        for (const s of skills) {
+            const agents = skillAgentMap.get(s.name);
+            const icon = agents ? `${GREEN}●${RESET}` : ` ${T.muted('○')}`;
+            const info = agents ? agents.join(', ') : `${T.muted('available')}`;
+            console.log(`  ${icon} ${s.name.padEnd(30)} ${info}`);
+        }
+        console.log('');
+    }
     console.log(summaryLine(ALL_SKILLS.filter(s => s.source === 'original').length, 0, ALL_SKILLS.filter(s => s.source === 'top-repo').length, ALL_SKILLS.length));
     console.log('');
     return 0;

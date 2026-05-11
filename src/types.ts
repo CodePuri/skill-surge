@@ -72,3 +72,9 @@ export interface InstallResult {
   success: boolean;
   error?: string;
 }
+
+export interface CacheData {
+  version: number;
+  generatedAt: string | null;
+  skills: Record<string, { installedAt: string; agents: string[] }>;
+}
