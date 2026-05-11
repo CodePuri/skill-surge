@@ -20,7 +20,7 @@ import { renderSplash, renderHelp, printCandidates } from './ui/splash.js';
 import { infoBox, successBox, warningBox, errorBox, dashboardBox } from './ui/box.js';
 import { renderCandidateTable } from './ui/table.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 
 interface Flags {
   [key: string]: boolean | string | string[] | undefined;
@@ -81,7 +81,7 @@ async function commandInit(): Promise<number> {
   console.log('\n' + infoBox(
     ' INITIALIZING ',
     gradient(['#00FFFF', '#FF00FF', '#FF6EC7'])(
-      '\n  Welcome to Auto Skills — your agent intelligence layer.\n' +
+      '\n  Welcome to Skill Surge — your agent intelligence layer.\n' +
       '  Setting up your environment...',
     ),
   ) + '\n');
@@ -129,7 +129,7 @@ async function commandInit(): Promise<number> {
   console.log('\n' + dashboardBox(envInfo) + '\n');
 
   const readyMsg = gradient(['#39FF14', '#00FFFF'])(
-    '\n  ✓ AUTO SKILLS READY\n' +
+    '\n  ✓ SKILL SURGE READY\n' +
     '  \n' +
     '  Run:  skill-surge suggest --task "your task"\n' +
     '  Or:   Start any prompt with: skill-surge: <your request>\n',
@@ -151,7 +151,7 @@ async function commandInit(): Promise<number> {
 function commandDoctor(): number {
   console.log('\n' + infoBox(
     ' HEALTH CHECK ',
-    gradient(['#00FFFF', '#FF6EC7'])('\n  Auto Skills — system diagnostics\n'),
+    gradient(['#00FFFF', '#FF6EC7'])('\n  Skill Surge — system diagnostics\n'),
   ) + '\n');
 
   const entries: { label: string; value: string }[] = [];

@@ -14,7 +14,7 @@ import { installCandidate } from './core/installer.js';
 import { renderSplash, renderHelp, printCandidates } from './ui/splash.js';
 import { infoBox, successBox, warningBox, errorBox, dashboardBox } from './ui/box.js';
 import { renderCandidateTable } from './ui/table.js';
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 function parseArgv(argv) {
     const flags = {};
     const positionals = [];
@@ -48,7 +48,7 @@ function parseArgv(argv) {
     return { command: positionals[0], positionals: positionals.slice(1), flags };
 }
 async function commandInit() {
-    console.log('\n' + infoBox(' INITIALIZING ', gradient(['#00FFFF', '#FF00FF', '#FF6EC7'])('\n  Welcome to Auto Skills — your agent intelligence layer.\n' +
+    console.log('\n' + infoBox(' INITIALIZING ', gradient(['#00FFFF', '#FF00FF', '#FF6EC7'])('\n  Welcome to Skill Surge — your agent intelligence layer.\n' +
         '  Setting up your environment...')) + '\n');
     const spinner = ora({ text: 'Scanning bundled skills...', color: 'magenta' }).start();
     const config = loadConfig();
@@ -86,7 +86,7 @@ async function commandInit() {
     const cache = loadCache();
     envInfo.push({ label: 'Cached Skills', value: String(cache.candidates.length) });
     console.log('\n' + dashboardBox(envInfo) + '\n');
-    const readyMsg = gradient(['#39FF14', '#00FFFF'])('\n  ✓ AUTO SKILLS READY\n' +
+    const readyMsg = gradient(['#39FF14', '#00FFFF'])('\n  ✓ SKILL SURGE READY\n' +
         '  \n' +
         '  Run:  skill-surge suggest --task "your task"\n' +
         '  Or:   Start any prompt with: skill-surge: <your request>\n');
@@ -99,7 +99,7 @@ async function commandInit() {
     return 0;
 }
 function commandDoctor() {
-    console.log('\n' + infoBox(' HEALTH CHECK ', gradient(['#00FFFF', '#FF6EC7'])('\n  Auto Skills — system diagnostics\n')) + '\n');
+    console.log('\n' + infoBox(' HEALTH CHECK ', gradient(['#00FFFF', '#FF6EC7'])('\n  Skill Surge — system diagnostics\n')) + '\n');
     const entries = [];
     entries.push({ label: 'Version', value: VERSION });
     entries.push({ label: 'Node', value: process.version });

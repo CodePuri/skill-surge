@@ -43,7 +43,7 @@ export function dashboardBox(entries) {
         padding: 1,
         borderStyle: 'double',
         borderColor: 'magenta',
-        title: gradient(['#FF6EC7', '#00FFFF'])(' AUTO SKILLS DASHBOARD '),
+        title: gradient(['#FF6EC7', '#00FFFF'])(' SKILL SURGE DASHBOARD '),
         titleAlignment: 'center',
     });
 }
