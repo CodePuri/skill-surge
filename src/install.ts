@@ -6,20 +6,6 @@ import { fileURLToPath } from 'node:url';
 import type { Agent, Skill, ScanResult, InstallResult, Config, CacheData } from './types.js';
 import { ALL_SKILLS } from './search.js';
 
-const AGENT_REGISTRY: Omit<Agent, 'installed'>[] = [
-  { name: 'Claude Code',    slug: 'claude-code', globalPath: '~/.claude/skills/',                  localPath: './.claude/skills/' },
-  { name: 'OpenCode',       slug: 'opencode',    globalPath: '~/.config/opencode/skills/',          localPath: './.opencode/skills/' },
-  { name: 'Codex',          slug: 'codex',       globalPath: '~/.codex/skills/',                   localPath: './.codex/skills/' },
-  { name: 'Cline',         slug: 'cline',       globalPath: '~/.agents/skills/',                   localPath: './.agents/skills/' },
-  { name: 'Cursor',         slug: 'cursor',      globalPath: '~/.cursor/skills/',                   localPath: './.cursor/skills/' },
-  { name: 'Windsurf',       slug: 'windsurf',    globalPath: '~/.codeium/windsurf/skills/',          localPath: './.windsurf/skills/' },
-  { name: 'GitHub Copilot', slug: 'github-copilot', globalPath: '~/.copilot/skills/',              localPath: './.copilot/skills/' },
-  { name: 'Goose',         slug: 'goose',       globalPath: '~/.config/goose/skills/',             localPath: './.goose/skills/' },
-  { name: 'Roo Code',       slug: 'roo',        globalPath: '~/.roo/skills/',                       localPath: './.roo/skills/' },
-  { name: 'Augment',        slug: 'augment',     globalPath: '~/.augment/skills/',                  localPath: './.augment/skills/' },
-  { name: 'Continue',       slug: 'continue',    globalPath: '~/.continue/skills/',                 localPath: './.continue/skills/' },
-];
-
 function expandHome(p: string): string {
   if (p === '~') return os.homedir();
   if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2));
@@ -27,11 +13,96 @@ function expandHome(p: string): string {
   return p;
 }
 
+
+
 export function detectAgents(): Agent[] {
-  return AGENT_REGISTRY.map(agent => ({
-    ...agent,
-    installed: fs.existsSync(expandHome(agent.globalPath)),
-  }));
+  const home = os.homedir();
+  const cwd = process.cwd();
+  const visited = new Set<string>();
+  const found: Agent[] = [];
+
+  // Phase 1: Known config paths (fast path)
+  const knownPaths: Array<{name: string; slug: string; globalPath: string; localPath: string}> = [
+    { name: 'Claude Code',    slug: 'claude-code',    globalPath: path.join(home, '.claude', 'skills'), localPath: path.join('./.claude', 'skills') },
+    { name: 'OpenCode',       slug: 'opencode',       globalPath: path.join(home, '.config', 'opencode', 'skills'), localPath: path.join('./.opencode', 'skills') },
+    { name: 'Codex',          slug: 'codex',          globalPath: path.join(home, '.codex', 'skills'), localPath: path.join('./.codex', 'skills') },
+    { name: 'Cline',         slug: 'cline',          globalPath: path.join(home, '.agents', 'skills'), localPath: path.join('./.agents', 'skills') },
+    { name: 'Cursor',         slug: 'cursor',         globalPath: path.join(home, '.cursor', 'skills'), localPath: path.join('./.cursor', 'skills') },
+    { name: 'Windsurf',       slug: 'windsurf',       globalPath: path.join(home, '.codeium', 'windsurf', 'skills'), localPath: path.join('./.windsurf', 'skills') },
+    { name: 'GitHub Copilot', slug: 'github-copilot', globalPath: path.join(home, '.copilot', 'skills'), localPath: path.join('./.copilot', 'skills') },
+    { name: 'Goose',         slug: 'goose',          globalPath: path.join(home, '.config', 'goose', 'skills'), localPath: path.join('./.goose', 'skills') },
+    { name: 'Roo Code',       slug: 'roo',            globalPath: path.join(home, '.roo', 'skills'), localPath: path.join('./.roo', 'skills') },
+    { name: 'Augment',        slug: 'augment',        globalPath: path.join(home, '.augment', 'skills'), localPath: path.join('./.augment', 'skills') },
+    { name: 'Continue',       slug: 'continue',       globalPath: path.join(home, '.continue', 'skills'), localPath: path.join('./.continue', 'skills') },
+  ];
+
+  for (const agent of knownPaths) {
+    if (fs.existsSync(agent.globalPath) && !visited.has(agent.globalPath)) {
+      visited.add(agent.globalPath);
+      found.push({ ...agent, installed: true });
+    }
+  }
+
+  // Phase 2: Globbing for skills/ dirs under common config paths
+  const configBase = path.join(home, '.config');
+  if (fs.existsSync(configBase)) {
+    try {
+      for (const entry of fs.readdirSync(configBase)) {
+        const globalPath = path.join(configBase, entry, 'skills');
+        const localPath = path.join('./' + entry, 'skills');
+        if (fs.existsSync(globalPath) && !visited.has(globalPath)) {
+          visited.add(globalPath);
+          found.push({ 
+            name: entry, 
+            slug: entry, 
+            globalPath,
+            localPath,
+            installed: true 
+          });
+        }
+      }
+    } catch (err) {
+      // Ignore errors reading .config directory
+    }
+  }
+
+  // Phase 2b: Any ~/.{something}/skills pattern
+  try {
+    const dotDirs = fs.readdirSync(home).filter(d => d.startsWith('.') && d.length > 1);
+    for (const dir of dotDirs) {
+      const globalPath = path.join(home, dir, 'skills');
+      const localPath = path.join('./' + dir, 'skills');
+      if (fs.existsSync(globalPath) && !visited.has(globalPath)) {
+        visited.add(globalPath);
+        found.push({ 
+          name: dir.replace('.', ''), 
+          slug: dir, 
+          globalPath,
+          localPath,
+          installed: true 
+        });
+      }
+    }
+  } catch (err) {
+    // Ignore errors reading home directory
+  }
+
+  // Phase 3: Fallback — create ~/.agents/skills if nothing found
+  if (found.length === 0) {
+    const globalPath = path.join(home, '.agents', 'skills');
+    const localPath = path.join('./.agents', 'skills');
+    fs.mkdirSync(globalPath, { recursive: true });
+    found.push({ name: 'Default', slug: 'default', globalPath, localPath, installed: true });
+  }
+
+  // Also check for project-specific skills directory
+  const projectGlobalPath = path.join(cwd, '.agents', 'skills');
+  const projectLocalPath = path.join('./.agents', 'skills');
+  if (fs.existsSync(projectGlobalPath) && !visited.has(projectGlobalPath)) {
+    found.push({ name: 'Project', slug: 'project', globalPath: projectGlobalPath, localPath: projectLocalPath, installed: true });
+  }
+
+  return found;
 }
 
 export function detectInstalledAgents(): Agent[] {
@@ -53,10 +124,36 @@ export function listInstalledSkills(agent: Agent, scope: 'global' | 'project'): 
 }
 
 export function getAgentBySlug(slug: string): Omit<Agent, 'installed'> | undefined {
-  return AGENT_REGISTRY.find(a => a.slug === slug);
+  // Return a mock agent for compatibility - in practice this should search through known agents
+  const agentMap: Record<string, Omit<Agent, 'installed'>> = {
+    'claude-code': { name: 'Claude Code', slug: 'claude-code', globalPath: '~/.claude/skills/', localPath: './.claude/skills/' },
+    'opencode': { name: 'OpenCode', slug: 'opencode', globalPath: '~/.config/opencode/skills/', localPath: './.opencode/skills/' },
+    'codex': { name: 'Codex', slug: 'codex', globalPath: '~/.codex/skills/', localPath: './.codex/skills/' },
+    'cline': { name: 'Cline', slug: 'cline', globalPath: '~/.agents/skills/', localPath: './.agents/skills/' },
+    'cursor': { name: 'Cursor', slug: 'cursor', globalPath: '~/.cursor/skills/', localPath: './.cursor/skills/' },
+    'windsurf': { name: 'Windsurf', slug: 'windsurf', globalPath: '~/.codeium/windsurf/skills/', localPath: './.windsurf/skills/' },
+    'github-copilot': { name: 'GitHub Copilot', slug: 'github-copilot', globalPath: '~/.copilot/skills/', localPath: './.copilot/skills/' },
+    'goose': { name: 'Goose', slug: 'goose', globalPath: '~/.config/goose/skills/', localPath: './.goose/skills/' },
+    'roo': { name: 'Roo Code', slug: 'roo', globalPath: '~/.roo/skills/', localPath: './.roo/skills/' },
+    'augment': { name: 'Augment', slug: 'augment', globalPath: '~/.augment/skills/', localPath: './.augent/skills/' },
+    'continue': { name: 'Continue', slug: 'continue', globalPath: '~/.continue/skills/', localPath: './.continue/skills/' },
+  };
+  return agentMap[slug] || null;
 }
 
-export const ALL_AGENTS = AGENT_REGISTRY.map(a => a.slug);
+export const ALL_AGENTS = [
+  'claude-code',
+  'opencode',
+  'codex',
+  'cline',
+  'cursor',
+  'windsurf',
+  'github-copilot',
+  'goose',
+  'roo',
+  'augment',
+  'continue',
+];
 
 export function cachePath(): string {
   const home = os.homedir();
