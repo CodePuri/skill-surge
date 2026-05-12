@@ -1,6 +1,6 @@
 {
   "name": "skill-surge",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Your agent's skill library. 29 curated skills. Auto-install to Claude Code, OpenCode, Cline, and more.",
   "type": "module",
   "bin": {

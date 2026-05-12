@@ -109,6 +109,37 @@ export function detectInstalledAgents(): Agent[] {
   return detectAgents().filter(a => a.installed);
 }
 
+// Detect which agent/IDE invoked this CLI by checking env vars
+export function detectCurrentAgent(): Agent | null {
+  const envMap: [string, string, string, string][] = [
+    ['CLAUDE_CODE', 'Claude Code', 'claude-code', '~/.claude/skills/'],
+    ['CLINE', 'Cline', 'cline', '~/.agents/skills/'],
+    ['OPENCODE', 'OpenCode', 'opencode', '~/.config/opencode/skills/'],
+    ['CURSOR', 'Cursor', 'cursor', '~/.cursor/skills/'],
+    ['WINDSURF', 'Windsurf', 'windsurf', '~/.codeium/windsurf/skills/'],
+    ['GITHUB_COPILOT', 'GitHub Copilot', 'github-copilot', '~/.copilot/skills/'],
+    ['GOOSE', 'Goose', 'goose', '~/.config/goose/skills/'],
+    ['ROO', 'Roo Code', 'roo', '~/.roo/skills/'],
+    ['AUGMENT', 'Augment', 'augment', '~/.augment/skills/'],
+    ['CONTINUE', 'Continue', 'continue', '~/.continue/skills/'],
+  ];
+
+  for (const [envVar, name, slug, globalPath] of envMap) {
+    if (process.env[envVar] === 'true' || process.env[envVar] === '1') {
+      return { name, slug, globalPath, localPath: `./${slug}/skills/`, installed: true };
+    }
+  }
+  
+  // Also check for IDE-specific env vars (cursor, vscode, etc.)
+  if (process.env.TERM_PROGRAM === 'vscode') {
+    // Running inside VS Code — could be any extension
+    // Don't guess, return null
+    return null;
+  }
+  
+  return null;
+}
+
 export function resolveAgentPath(agent: Agent, scope: 'global' | 'project'): string {
   return expandHome(scope === 'global' ? agent.globalPath : agent.localPath);
 }
