@@ -78,7 +78,7 @@
   <!-- Tagline -->
   <text x="400" y="92" font-family="'Courier New', monospace" font-size="10"
         fill="#b0b0b0" text-anchor="middle" letter-spacing="1">
-    14 pre-bundled skills • 3-layer discovery • safety-gated install • vaporwave UI
+    29 skills • 3-phase detection • 11+ agents • keyboard-driven UI
   </text>
 
   <!-- Command box -->
@@ -90,17 +90,17 @@
   </text>
 
   <!-- Badges -->
-  <rect x="140" y="148" width="90" height="20" rx="4" fill="url(#pink)" opacity="0.2" rx="4"/>
-  <text x="185" y="162" font-family="'Courier New', monospace" font-size="9" fill="#FF6EC7" text-anchor="middle">14 BUNDLED</text>
+  <rect x="140" y="148" width="90" height="20" rx="4" fill="url(#pink)" opacity="0.2"/>
+  <text x="185" y="162" font-family="'Courier New', monospace" font-size="9" fill="#FF6EC7" text-anchor="middle">29 SKILLS</text>
 
   <rect x="240" y="148" width="90" height="20" rx="4" fill="url(#cyan)" opacity="0.2"/>
-  <text x="285" y="162" font-family="'Courier New', monospace" font-size="9" fill="#00FFFF" text-anchor="middle">3-LAYER DISCOVERY</text>
+  <text x="285" y="162" font-family="'Courier New', monospace" font-size="9" fill="#00FFFF" text-anchor="middle">3-PHASE DETECT</text>
 
   <rect x="340" y="148" width="90" height="20" rx="4" fill="url(#gold)" opacity="0.2"/>
-  <text x="385" y="162" font-family="'Courier New', monospace" font-size="9" fill="#FFD700" text-anchor="middle">SAFETY GATED</text>
+  <text x="385" y="162" font-family="'Courier New', monospace" font-size="9" fill="#FFD700" text-anchor="middle">11+ AGENTS</text>
 
   <rect x="440" y="148" width="90" height="20" rx="4" fill="url(#green)" opacity="0.2"/>
-  <text x="485" y="162" font-family="'Courier New', monospace" font-size="9" fill="#39FF14" text-anchor="middle">VAPORWAVE UI</text>
+  <text x="485" y="162" font-family="'Courier New', monospace" font-size="9" fill="#39FF14" text-anchor="middle">KEYBOARD UI</text>
 
   <rect x="540" y="148" width="90" height="20" rx="4" fill="#7B68EE" opacity="0.2"/>
   <text x="585" y="162" font-family="'Courier New', monospace" font-size="9" fill="#7B68EE" text-anchor="middle">MIT LICENSE</text>
@@ -108,6 +108,6 @@
   <!-- Version -->
   <text x="780" y="25" font-family="'Courier New', monospace" font-size="10"
         fill="url(#gold)" text-anchor="end" opacity="0.8">
-    v1.0.0
+    v2.2.3
   </text>
 </svg>
