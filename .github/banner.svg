@@ -108,6 +108,6 @@
   <!-- Version -->
   <text x="780" y="25" font-family="'Courier New', monospace" font-size="10"
         fill="url(#gold)" text-anchor="end" opacity="0.8">
-    v2.2.3
+    v2.2.4
   </text>
 </svg>

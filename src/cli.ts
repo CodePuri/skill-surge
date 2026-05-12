@@ -15,7 +15,7 @@ import { logo, errorBanner, successBanner, sectionHeader, infoBox, progressBox, 
 import { skillsTable, candidateTable, installedTable, summaryLine, dashboardBox } from './ui/table.js';
 import { startSpinner, stopSpinner, stopSpinnerWithSuccess, stopSpinnerWithError } from './ui/spinner.js';
 
-const VERSION = '2.2.3';
+const VERSION = '2.2.4';
 const CYAN = C.brightCyan;
 const GREEN = C.brightGreen;
 const WHITE = C.white;
