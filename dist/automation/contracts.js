@@ -1,0 +1,1 @@
+export const AUTOMATION_SCHEMA_VERSION = 1;

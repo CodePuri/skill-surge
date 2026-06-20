@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import * as readline from 'node:readline';
 import { stdin, stdout } from 'node:process';
@@ -11,7 +12,17 @@ import { select, interactiveMultiSelect, confirmWithPrompt } from './ui/prompt.j
 import { logo, errorBanner, successBanner, sectionHeader, infoBox, installSummary, securityTable, installComplete } from './ui/banner.js';
 import { dashboardBox } from './ui/table.js';
 import { startSpinner, stopSpinner } from './ui/spinner.js';
-const VERSION = '2.2.1';
+import { refreshSkills } from './automation/refresh.js';
+import { collectDiagnostics } from './automation/diagnostics.js';
+import { validateReleaseRecord } from './automation/github-ledger.js';
+import { GithubLedger } from './automation/github-ledger.js';
+import { isKillSwitchActive, loadAutomationConfig } from './automation/policy.js';
+import { publishBundle, validatePublicationBundle } from './automation/publication.js';
+import { collectGrowthSnapshot } from './automation/metrics.js';
+import { collectXMetrics, publishToX } from './automation/platforms/x.js';
+import { collectRedditMetrics, publishToReddit } from './automation/platforms/reddit.js';
+import { collectSubstackMetrics, publishToSubstack } from './automation/platforms/substack.js';
+const VERSION = '2.2.4';
 const CYAN = C.brightCyan;
 const GREEN = C.brightGreen;
 const WHITE = C.white;
@@ -35,6 +46,8 @@ function printSplash() {
     console.log(`  ${CYAN}▸${RESET} skill-surge list       Show installed skills`);
     console.log(`  ${CYAN}▸${RESET} skill-surge suggest    Find skills for a task`);
     console.log(`  ${CYAN}▸${RESET} skill-surge hook       Agent trigger (JSON)`);
+    console.log(`  ${CYAN}▸${RESET} skill-surge refresh    Refresh trusted skill metadata`);
+    console.log(`  ${CYAN}▸${RESET} skill-surge automation Automation diagnostics and publishing`);
     console.log('');
     console.log('  Docs: ' + a('https://github.com/CodePuri/skill-surge'));
     console.log('');
@@ -190,18 +203,28 @@ async function cmdInit() {
     console.log('');
     const agents = detectAgents();
     const installed = agents.filter(a => a.installed);
+    console.log(`${CYAN}◇${RESET}  Agent Detection`);
     if (installed.length === 0) {
-        console.log(`${CYAN}◇${RESET}  No agent environments detected.`);
-        console.log(`  skill-surge will install skills to global directories regardless.`);
+        console.log(`  No agent environments detected. Will use global directories.`);
     }
     else {
-        console.log(`${CYAN}◇${RESET}  Detected agents:`);
         for (const agent of installed) {
-            console.log(`    ${CYAN}▸${RESET} ${agent.name}  ${T.muted(agent.globalPath)}`);
+            console.log(`    ${CYAN}▸${RESET} ${agent.name.padEnd(16)} ${T.muted(agent.globalPath)}`);
         }
     }
     console.log('');
     const agentsToUse = installed.length > 0 ? installed : agents;
+    // Scope selection
+    t('  Installation scope:');
+    const scopeIdx = await select('', ['Global  (recommended)', 'Project  (./.agents/skills/)', 'Both global and project']);
+    const scopes = ['global', 'project', 'both'];
+    const scope = scopes[scopeIdx];
+    console.log('');
+    // Method selection
+    t('  Installation method:');
+    const methodIdx = await select('', ['Symlink  (recommended)', 'Copy']);
+    const method = methodIdx === 0 ? 'symlink' : 'copy';
+    console.log('');
     const essential = [
         'brainstorming', 'writing-plans', 'executing-plans',
         'systematic-debugging', 'tdd', 'node-api-design',
@@ -210,15 +233,23 @@ async function cmdInit() {
         'git-workflow', 'system-design', 'project-planning',
     ];
     const essentialSkills = ALL_SKILLS.filter(s => essential.includes(s.name));
-    console.log(`${CYAN}◇${RESET}  Installing ${essentialSkills.length} essential skills to ${agentsToUse.length} agent(s).`);
-    console.log(`  ${T.muted('Skills: ' + essentialSkills.map(s => s.name).join(', '))}`);
+    console.log(`${CYAN}◇${RESET}  15 essential skills selected:`);
+    console.log(`  ${T.muted(essentialSkills.map(s => s.name).join(', '))}`);
+    console.log('');
+    console.log(`  ${T.muted('Scope:')} ${scope}    ${T.muted('Method:')} ${method}    ${T.muted('Agents:')} ${agentsToUse.length}`);
+    console.log('');
+    const proceed = await confirmWithPrompt('Install 15 essential skills?');
+    if (!proceed) {
+        console.log('\n  Init cancelled.\n');
+        return 0;
+    }
     console.log('');
     startSpinner('Installing essential skills...');
     let installedCount = 0;
     for (const skill of essentialSkills) {
         await new Promise(resolve => setTimeout(resolve, 100));
         for (const agent of agentsToUse) {
-            const results = installSkillToAgents(skill.name, [agent], 'global', { installMode: 'symlink' });
+            const results = installSkillToAgents(skill.name, [agent], scope, { installMode: method });
             if (results.some(r => r.success))
                 installedCount++;
         }
@@ -342,34 +373,60 @@ async function cmdSuggest(args) {
         console.log(`    [${i + 1}] ${installed} ${skill.name.padEnd(20)} — ${skill.reason}`);
     }
     console.log('');
-    // Get user input for selection
-    const selectionInput = await new Promise((resolve) => {
-        const rl = readline.createInterface({ input: stdin, output: stdout });
-        rl.question('Install one? [1-3 / Enter to skip]: ', (answer) => {
-            rl.close();
-            resolve(answer.trim());
-        });
+    // Keyboard-driven selection — press 1,2,3 to install, Enter to skip
+    const selection = await new Promise((resolve) => {
+        readline.emitKeypressEvents(stdin);
+        const wasRaw = stdin.isRaw;
+        if (stdin.isTTY)
+            stdin.setRawMode(true);
+        stdout.write('Install one? [1-3 / Enter to skip]: ');
+        function cleanup() {
+            if (stdin.isTTY && stdin.isRaw)
+                stdin.setRawMode(false);
+            stdin.removeListener('keypress', handler);
+        }
+        function handler(str, key) {
+            if (!key) {
+                // EOF on pipe
+                cleanup();
+                resolve(null);
+                return;
+            }
+            if (key.name === 'return' || key.name === 'enter') {
+                cleanup();
+                stdout.write('\n');
+                resolve(null);
+            }
+            else if (str === '1') {
+                cleanup();
+                stdout.write('1\n');
+                resolve(0);
+            }
+            else if (str === '2') {
+                cleanup();
+                stdout.write('2\n');
+                resolve(1);
+            }
+            else if (str === '3') {
+                cleanup();
+                stdout.write('3\n');
+                resolve(2);
+            }
+        }
+        stdin.on('keypress', handler);
     });
-    // If user just pressed Enter, skip
-    if (selectionInput === '') {
+    if (selection === null) {
         console.log('');
         return 0;
     }
-    // Parse selection
-    const selection = parseInt(selectionInput, 10);
-    if (isNaN(selection) || selection < 1 || selection > 3) {
-        console.log('  Invalid selection. Skipping.');
-        return 0;
-    }
-    const selectedSkill = top3[selection - 1];
-    console.log(`  Installing ${selectedSkill.name}...`);
+    const selectedSkill = top3[selection];
+    console.log(`\n  Installing ${selectedSkill.name}...`);
     // Auto-install the selected skill
     const agentsToInstall = detectAgents();
     for (const agent of agentsToInstall) {
         installSkillToAgents(selectedSkill.name, [agent], 'global');
     }
-    console.log(`  ✓ Installed ${selectedSkill.name} to ${agentsToInstall.length} agent(s).`);
-    console.log('');
+    console.log(`  ✓ Installed ${selectedSkill.name} to ${agentsToInstall.length} agent(s).\n`);
     return 0;
 }
 async function cmdList() {
@@ -566,6 +623,190 @@ async function cmdConfig() {
     console.log(JSON.stringify(config, null, 2));
     return 0;
 }
+function gitSourceSha() {
+    const result = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', shell: false });
+    return result.status === 0 ? result.stdout.trim() : 'unknown';
+}
+function refreshCachePath() {
+    return process.env.SKILL_SURGE_REFRESH_CACHE
+        || path.join(os.homedir(), '.cache', 'skill-surge', 'refresh-index.json');
+}
+function refreshLocalRoots() {
+    return [
+        { path: path.resolve('skills/original'), source: 'repo:skills/original' },
+        { path: path.join(os.homedir(), '.agents', 'skills'), source: '~/.agents/skills' },
+        { path: path.join(os.homedir(), '.codex', 'skills'), source: '~/.codex/skills' },
+        { path: path.join(os.homedir(), '.claude', 'skills'), source: '~/.claude/skills' },
+    ];
+}
+function trustedRemoteRepos() {
+    const trusted = new Set(loadConfig().trustedOwners.map(owner => owner.toLowerCase()));
+    return [...new Set(ALL_SKILLS.flatMap(skill => skill.repo ? [skill.repo] : []))]
+        .filter(repo => trusted.has(repo.split('/')[0].toLowerCase()));
+}
+async function createRefreshReport(network) {
+    return refreshSkills({
+        network,
+        cachePath: refreshCachePath(),
+        localRoots: refreshLocalRoots(),
+        remoteRepos: trustedRemoteRepos(),
+        sourceSha: gitSourceSha(),
+    });
+}
+async function cmdRefresh(args) {
+    const report = await createRefreshReport(args.includes('--network'));
+    if (args.includes('--json'))
+        console.log(JSON.stringify(report, null, 2));
+    else {
+        console.log(`Refresh ${report.cycleId}: ${report.localSkills.length} local skills`);
+        console.log(`Added ${report.added.length}, changed ${report.changed.length}, removed ${report.removed.length}`);
+        console.log(`Cache: ${report.cachePath}`);
+    }
+    return report.remoteSources.some(source => !source.inspected) ? 2 : 0;
+}
+function readGitHubBugIssues() {
+    const result = spawnSync('gh', ['issue', 'list', '--state', 'open', '--limit', '100', '--json', 'number,title,body,labels'], {
+        encoding: 'utf8', timeout: 30_000, shell: false,
+    });
+    if (result.status !== 0)
+        return [];
+    try {
+        const issues = JSON.parse(result.stdout);
+        return issues.map(issue => ({ ...issue, labels: issue.labels.map(label => label.name) }));
+    }
+    catch {
+        return [];
+    }
+}
+async function cmdAutomation(args) {
+    const [action, ...rest] = args;
+    if (action === 'validate-release') {
+        const file = rest[0];
+        if (!file) {
+            console.error('Usage: skill-surge automation validate-release <file>');
+            return 1;
+        }
+        const release = validateReleaseRecord(JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')));
+        console.log(`Release record ${release.cycleId} is valid.`);
+        return 0;
+    }
+    if (action === 'publish') {
+        const file = rest.find(arg => !arg.startsWith('--'));
+        if (!file) {
+            console.error('Usage: skill-surge automation publish <bundle> [--dry-run]');
+            return 1;
+        }
+        const dryRun = rest.includes('--dry-run');
+        const bundle = validatePublicationBundle(JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')));
+        const config = loadAutomationConfig();
+        if (!dryRun && isKillSwitchActive('publish')) {
+            console.error('Publication paused by kill switch.');
+            return 3;
+        }
+        const enabledPlatforms = ['substack', 'x', 'reddit']
+            .filter(platform => config.publication.enabled && config.publication.platforms[platform]);
+        const repo = process.env.GITHUB_REPOSITORY || 'CodePuri/skill-surge';
+        const ledger = dryRun ? undefined : new GithubLedger({ repo });
+        const issue = ledger ? await ledger.findCycleIssue(bundle.cycleId) : undefined;
+        if (ledger && issue === undefined)
+            throw new Error(`No GitHub cycle issue found for ${bundle.cycleId}`);
+        const existing = ledger && issue !== undefined
+            ? await ledger.readTypedComments(issue, 'publication-result')
+            : [];
+        const required = (name) => {
+            const value = process.env[name];
+            if (!value)
+                throw new Error(`Missing required environment variable ${name}`);
+            return value;
+        };
+        const adapters = dryRun ? {} : {
+            x: (content) => publishToX(content, {
+                clientId: required('X_CLIENT_ID'), clientSecret: required('X_CLIENT_SECRET'),
+                refreshToken: required('X_REFRESH_TOKEN'), userId: required('X_USER_ID'),
+            }),
+            reddit: (content) => publishToReddit(content, config.publication.redditAllowlist, {
+                clientId: required('REDDIT_CLIENT_ID'), clientSecret: required('REDDIT_CLIENT_SECRET'),
+                refreshToken: required('REDDIT_REFRESH_TOKEN'), userAgent: required('REDDIT_USER_AGENT'),
+            }),
+            substack: (content) => publishToSubstack(content, {
+                publicationUrl: required('SUBSTACK_PUBLICATION_URL'),
+                storageStatePath: path.resolve(required('SUBSTACK_STORAGE_STATE').replace(/^~(?=\/)/, os.homedir())),
+            }),
+        };
+        const results = await publishBundle({
+            bundle, enabledPlatforms, existingResults: existing,
+            maxRetries: config.publication.maxRetries, retryBackoffMs: config.publication.retryBackoffMs,
+            dryRun, adapters,
+            recordResult: async (result) => {
+                if (ledger && issue !== undefined)
+                    await ledger.appendTypedComment(issue, 'publication-result', result);
+            },
+        });
+        console.log(JSON.stringify(results, null, 2));
+        return results.some(result => result.status === 'failed') ? 2 : 0;
+    }
+    if (action === 'metrics') {
+        const cycleId = rest[0];
+        if (!cycleId) {
+            console.error('Usage: skill-surge automation metrics <cycle-id> --json');
+            return 1;
+        }
+        if (isKillSwitchActive('publish')) {
+            console.error('Publication metrics paused by kill switch.');
+            return 3;
+        }
+        const ledger = new GithubLedger({ repo: process.env.GITHUB_REPOSITORY || 'CodePuri/skill-surge' });
+        const issue = await ledger.findCycleIssue(cycleId);
+        if (issue === undefined)
+            throw new Error(`No GitHub cycle issue found for ${cycleId}`);
+        const results = await ledger.readTypedComments(issue, 'publication-result');
+        const required = (name) => process.env[name] || '';
+        const xCredentials = {
+            clientId: required('X_CLIENT_ID'), clientSecret: required('X_CLIENT_SECRET'),
+            refreshToken: required('X_REFRESH_TOKEN'), userId: required('X_USER_ID'),
+        };
+        const redditUserAgent = required('REDDIT_USER_AGENT');
+        const substackConfig = {
+            publicationUrl: required('SUBSTACK_PUBLICATION_URL'),
+            storageStatePath: path.resolve(required('SUBSTACK_STORAGE_STATE').replace(/^~(?=\/)/, os.homedir())),
+        };
+        const collectors = {};
+        if (xCredentials.clientId && xCredentials.refreshToken)
+            collectors.x = (result) => collectXMetrics(result, xCredentials);
+        if (redditUserAgent)
+            collectors.reddit = (result) => collectRedditMetrics(result, { userAgent: redditUserAgent });
+        if (substackConfig.publicationUrl && substackConfig.storageStatePath)
+            collectors.substack = (result) => collectSubstackMetrics(result, substackConfig);
+        const snapshot = await collectGrowthSnapshot({
+            cycleId, sourceSha: results[0]?.sourceSha || gitSourceSha(),
+            format: results.find(result => result.format)?.format || 'tutorial', publicationResults: results,
+            platformCollectors: collectors, repo: process.env.GITHUB_REPOSITORY || 'CodePuri/skill-surge', packageName: 'skill-surge',
+        });
+        await ledger.appendTypedComment(issue, 'growth-snapshot', snapshot);
+        console.log(JSON.stringify(snapshot, null, 2));
+        return 0;
+    }
+    if (action !== 'diagnose') {
+        console.error('Usage: skill-surge automation diagnose --json | validate-release <file> | publish <bundle> [--dry-run] | metrics <cycle-id> --json');
+        return 1;
+    }
+    const refreshReport = await createRefreshReport(false);
+    const findings = await collectDiagnostics({
+        refreshReport,
+        commands: [
+            { name: 'build', command: 'npm run build' },
+            { name: 'test', command: `SKILL_SURGE_CACHE=${JSON.stringify(path.join(os.tmpdir(), 'skill-surge-diagnostics-cache.json'))} npm test` },
+            { name: 'audit', command: 'npm audit --omit=dev --audit-level=high' },
+        ],
+        githubIssues: readGitHubBugIssues(),
+        modelFindings: [],
+    });
+    if (rest.includes('--json'))
+        console.log(JSON.stringify({ refreshReport, findings }, null, 2));
+    else
+        console.log(`Diagnostics: ${findings.length} finding(s), ${findings.filter(finding => finding.eligible).length} eligible`);
+    return findings.some(finding => finding.source !== 'catalog' && finding.eligible) ? 2 : 0;
+}
 function printHelp() {
     printSplash();
 }
@@ -577,6 +818,8 @@ const COMMANDS = {
     list: cmdList,
     hook: cmdHook,
     config: cmdConfig,
+    refresh: cmdRefresh,
+    automation: cmdAutomation,
 };
 (async () => {
     const [, , command, ...args] = process.argv;
