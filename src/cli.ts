@@ -16,6 +16,7 @@ import { skillsTable, candidateTable, installedTable, summaryLine, dashboardBox 
 import { startSpinner, stopSpinner, stopSpinnerWithSuccess, stopSpinnerWithError } from './ui/spinner.js';
 import { refreshSkills } from './automation/refresh.js';
 import { collectDiagnostics } from './automation/diagnostics.js';
+import { validateReleaseRecord } from './automation/github-ledger.js';
 
 const VERSION = '2.2.4';
 const CYAN = C.brightCyan;
@@ -754,8 +755,18 @@ function readGitHubBugIssues() {
 
 async function cmdAutomation(args: string[]) {
   const [action, ...rest] = args;
+  if (action === 'validate-release') {
+    const file = rest[0];
+    if (!file) {
+      console.error('Usage: skill-surge automation validate-release <file>');
+      return 1;
+    }
+    const release = validateReleaseRecord(JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')));
+    console.log(`Release record ${release.cycleId} is valid.`);
+    return 0;
+  }
   if (action !== 'diagnose') {
-    console.error('Usage: skill-surge automation diagnose --json');
+    console.error('Usage: skill-surge automation diagnose --json | skill-surge automation validate-release <file>');
     return 1;
   }
   const refreshReport = await createRefreshReport(false);

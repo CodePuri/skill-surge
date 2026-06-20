@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: quality-node-${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+        env:
+          SKILL_SURGE_CACHE: ${{ runner.temp }}/skill-surge-test-cache.json
+      - run: node dist/cli.js --version
+      - run: node dist/cli.js refresh --json
+        env:
+          SKILL_SURGE_REFRESH_CACHE: ${{ runner.temp }}/skill-surge-refresh-cache.json
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: node scripts/automation/secret-scan.mjs
+
+  package:
+    name: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm pack --dry-run
+
+  merge-gate:
+    name: merge-gate
+    if: always()
+    needs: [quality, security, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every verification job
+        run: |
+          test "${{ needs.quality.result }}" = "success"
+          test "${{ needs.security.result }}" = "success"
+          test "${{ needs.package.result }}" = "success"

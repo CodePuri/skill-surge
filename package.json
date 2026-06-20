@@ -11,7 +11,10 @@
     "start": "node dist/cli.js",
     "prepublishOnly": "npm run build",
     "test": "node --test tests/smoke.test.ts tests/automation/*.test.ts",
-    "test:automation": "node --test tests/automation/*.test.ts"
+    "test:automation": "node --test tests/automation/*.test.ts",
+    "automation:canary": "node scripts/automation/release.mjs canary --execute",
+    "automation:canary:dry-run": "node scripts/automation/release.mjs canary --dry-run",
+    "automation:secret-scan": "node scripts/automation/secret-scan.mjs"
   },
   "files": [
     "dist",
