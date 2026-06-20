@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/cli.js",
     "prepublishOnly": "npm run build",
-    "test": "node --test tests/smoke.test.ts"
+    "test": "node --test tests/smoke.test.ts tests/automation/*.test.ts",
+    "test:automation": "node --test tests/automation/*.test.ts"
   },
   "files": [
     "dist",

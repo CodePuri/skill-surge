@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "selfImprove": {
+    "enabled": true,
+    "maxFixesPerCycle": 5,
+    "maxChangedFiles": 20,
+    "maxChangedLines": 1000,
+    "protectedPaths": [
+      ".github/workflows/**",
+      "config/automation.json",
+      "src/automation/policy.ts",
+      "src/automation/platforms/**",
+      "scripts/automation/run-with-env.sh",
+      "docs/SECURITY.md"
+    ]
+  },
+  "publication": {
+    "enabled": true,
+    "maxRetries": 2,
+    "retryBackoffMs": 1000,
+    "platforms": {
+      "x": true,
+      "reddit": true,
+      "substack": true
+    },
+    "maxPostsPerCycle": {
+      "x": 1,
+      "reddit": 1,
+      "substack": 1
+    },
+    "redditAllowlist": [
+      "SideProject",
+      "opensource",
+      "ChatGPTCoding",
+      "ClaudeAI"
+    ]
+  }
+}
