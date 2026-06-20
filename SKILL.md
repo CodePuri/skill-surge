@@ -1,11 +1,11 @@
 ---
 name: skill-surge
-description: Your agent's skill library. 29 curated skills. Interactive installation like skills.sh. Use when building software, designing systems, writing tests, debugging, planning, or deploying. Triggers on: skill-surge, add, suggest, hook, scan, list.
+description: Your agent's skill library. 37 curated skills. Interactive installation like skills.sh. Use when building software, designing systems, writing tests, debugging, planning, or deploying. Triggers on: skill-surge, add, suggest, hook, scan, list.
 ---
 
 # skill-surge
 
-Your agent's skill library. 29 curated skills covering workflow, frontend, backend, database, architecture, design, QA, and planning.
+Your agent's skill library. 37 curated skills covering workflow, frontend, backend, database, architecture, design, QA, and planning.
 
 ## Installation
 
@@ -34,34 +34,22 @@ When the user starts a prompt with "skill-surge:" or references skills:
 2. Load the detected SKILL.md files into context
 3. Proceed with the task using skill guidance
 
-## Skills Catalog (29 total)
+## Skills Catalog (37 total)
 
-### Workflow (11)
-- find-skills, grill-me, tdd, systematic-debugging, writing-plans, executing-plans, brainstorming, verification-before-completion, finishing-a-development-branch, requesting-code-review, git-workflow
+### Workflow & Planning
+- find-skills, grill-me, tdd, systematic-debugging, writing-plans, executing-plans, brainstorming, verification-before-completion, finishing-a-development-branch, requesting-code-review, git-workflow, project-planning
 
-### Frontend (4)
-- vercel-react-best-practices (388K), next-best-practices (82K), react-patterns, docx (83K)
+### Frontend
+- vercel-react-best-practices, next-best-practices, next-cache-components, next-upgrade, vercel-composition-patterns, vercel-react-native-skills, vercel-react-view-transitions, react-patterns
 
-### Design (3)
-- frontend-design (394K), ui-ux-pro-max (156K), accessibility-first
+### Design
+- frontend-design, ui-ux-pro-max, terminal-ui, web-design-guidelines, accessibility-first
 
-### Backend (5)
-- node-api-design, auth-systems, error-handling, security-hardening, deploy-to-vercel (47K)
+### Backend, Database, and Security
+- node-api-design, auth-systems, error-handling, supabase-postgres-best-practices, database-patterns, security-hardening
 
-### Database (2)
-- supabase-postgres-best-practices (156K), database-patterns
-
-### Architecture (1)
-- system-design
-
-### QA (1)
-- testing-strategies
-
-### Planning (1)
-- project-planning
-
-### Meta (2)
-- skill-creator (197K), skill-surge
+### DevOps, QA, Architecture, Docs, Meta
+- deploy-to-vercel, vercel-cli-with-tokens, testing-strategies, system-design, docx, skill-creator
 
 ## Example Usage
 

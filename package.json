@@ -1,7 +1,7 @@
 {
   "name": "skill-surge",
-  "version": "2.2.4",
-  "description": "Your agent's skill library. 29 curated skills. Auto-install to Claude Code, OpenCode, Cline, and more.",
+  "version": "2.3.0",
+  "description": "Your agent's skill library. 37 curated skills. Auto-install to Claude Code, OpenCode, Cline, and more.",
   "type": "module",
   "bin": {
     "skill-surge": "dist/cli.js"
@@ -9,12 +9,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/cli.js",
-    "prepublishOnly": "npm run build",
-    "test": "node --test tests/smoke.test.ts"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test tests/smoke.test.js",
+    "verify": "npm run typecheck && npm test",
+    "prepublishOnly": "npm run verify"
   },
   "files": [
     "dist",
     "config",
+    "skills/original",
     "README.md",
     "SKILL.md",
     "LICENSE"

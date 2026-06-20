@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import * as readline from 'node:readline';
 import { stdin, stdout } from 'node:process';
-import type { Agent, ScoredCandidate, ScanResult } from './types.js';
+import { VERSION, type Agent, type ScoredCandidate, type ScanResult } from './types.js';
 import { detectAgents, detectInstalledAgents, resolveAgentPath, auditProject, loadConfig, loadCache, saveCache, userConfigPath, installSkillToAgents, installTopRepoSkills } from './install.js';
 import { ALL_SKILLS, getSkillByName, isTrivialTask, rankSkillsForTask, runSkillsFind } from './search.js';
 import { T, box, divider, header, C } from './ui/terminal.js';
@@ -15,7 +15,6 @@ import { logo, errorBanner, successBanner, sectionHeader, infoBox, progressBox, 
 import { skillsTable, candidateTable, installedTable, summaryLine, dashboardBox } from './ui/table.js';
 import { startSpinner, stopSpinner, stopSpinnerWithSuccess, stopSpinnerWithError } from './ui/spinner.js';
 
-const VERSION = '2.2.4';
 const CYAN = C.brightCyan;
 const GREEN = C.brightGreen;
 const WHITE = C.white;
@@ -533,7 +532,7 @@ async function cmdList() {
     { label: 'Design / UX',         internal: ['design'] },
     { label: 'QA / Testing',        internal: ['qa'] },
     { label: 'Architecture',        internal: ['architecture'] },
-    { label: 'All Skills (29 total)', internal: [] },
+    { label: `All Skills (${ALL_SKILLS.length} total)`, internal: [] },
   ];
 
   const categoryChoices = categoryMap.map(c => c.label);

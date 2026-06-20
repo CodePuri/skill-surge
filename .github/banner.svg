@@ -78,7 +78,7 @@
   <!-- Tagline -->
   <text x="400" y="92" font-family="'Courier New', monospace" font-size="10"
         fill="#b0b0b0" text-anchor="middle" letter-spacing="1">
-    29 skills • 3-phase detection • 11+ agents • keyboard-driven UI
+    37 skills • 3-phase detection • 11+ agents • keyboard-driven UI
   </text>
 
   <!-- Command box -->
@@ -91,7 +91,7 @@
 
   <!-- Badges -->
   <rect x="140" y="148" width="90" height="20" rx="4" fill="url(#pink)" opacity="0.2"/>
-  <text x="185" y="162" font-family="'Courier New', monospace" font-size="9" fill="#FF6EC7" text-anchor="middle">29 SKILLS</text>
+  <text x="185" y="162" font-family="'Courier New', monospace" font-size="9" fill="#FF6EC7" text-anchor="middle">37 SKILLS</text>
 
   <rect x="240" y="148" width="90" height="20" rx="4" fill="url(#cyan)" opacity="0.2"/>
   <text x="285" y="162" font-family="'Courier New', monospace" font-size="9" fill="#00FFFF" text-anchor="middle">3-PHASE DETECT</text>
@@ -108,6 +108,6 @@
   <!-- Version -->
   <text x="780" y="25" font-family="'Courier New', monospace" font-size="10"
         fill="url(#gold)" text-anchor="end" opacity="0.8">
-    v2.2.4
+    v2.3.0
   </text>
 </svg>

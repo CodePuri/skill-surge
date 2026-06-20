@@ -13,7 +13,7 @@ npm run build
 
 ```bash
 npm run build    # Compile TypeScript
-npm test         # Run tests
+npm run verify   # Typecheck + build + tests
 npm start        # Run CLI locally: node dist/cli.js
 ```
 
@@ -47,14 +47,17 @@ npm start        # Run CLI locally: node dist/cli.js
 
 1. Create a branch from `main`
 2. Make your changes
-3. Run `npm run build && npm test` — all must pass
+3. Run `npm run verify` — all must pass
 4. Open a PR with a clear description of what changed and why
 
 ## Release Process
 
-1. Bump version in `package.json` and `src/cli.ts` VERSION constant
-2. Run `npm run build`
-3. Run `npm test`
-4. Commit: `chore: bump to vX.Y.Z`
-5. `npm publish --access public`
-6. Tag: `git tag vX.Y.Z && git push --tags`
+1. Bump `package.json` and `src/types.ts` to the same version.
+2. Review any `skills-lock.json` hash changes explicitly before accepting them.
+3. Run `npm run verify`.
+4. Run `npm pack --dry-run` and `npm pack --pack-destination /tmp`.
+5. Audit the tarball contents and smoke-test the unpacked package.
+6. Commit the verified release changes.
+7. Publish the exact verified tarball with `npm publish /tmp/<tarball> --access public`.
+8. Verify npm reports the new version as `latest`.
+9. Tag and push: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push --follow-tags`.

@@ -3,6 +3,10 @@ const CYAN = C.brightCyan;
 const MAGENTA = C.brightMagenta;
 const WHITE = C.white;
 const RESET = C.reset;
+const ANSI_RE = /\x1B\[[0-?]*[ -/]*[@-~]/g;
+function visibleLength(value) {
+    return value.replace(ANSI_RE, '').length;
+}
 export function logo() {
     return `
 ${CYAN}███████╗██╗  ██╗██╗██╗     ██╗     ███████╗${RESET}
@@ -48,7 +52,9 @@ export function boxLine(label, value) {
 export function infoBox(title, lines) {
     const width = 74;
     const top = `${CYAN}┌─${title}${'─'.repeat(width - title.length - 3)}─┐${RESET}`;
-    const middle = lines.map(line => `${CYAN}│${RESET} ${line}${' '.repeat(width - line.length - 2)}${CYAN}│${RESET}`).join('\n');
+    const middle = lines
+        .map(line => `${CYAN}│${RESET} ${line}${' '.repeat(Math.max(0, width - visibleLength(line) - 2))}${CYAN}│${RESET}`)
+        .join('\n');
     const bottom = `${CYAN}└${'─'.repeat(width + 1)}─┘${RESET}`;
     return `${top}\n${middle}\n${bottom}`;
 }
@@ -68,7 +74,8 @@ export function installSummary(items) {
     const top = `${CYAN}┌─ Installation Summary ${'─'.repeat(width - 22)}─┐${RESET}`;
     const lines = items.map(item => {
         const path = item.path.slice(0, 50).padEnd(50);
-        return `${CYAN}│${RESET} ${path}\n${CYAN}│${RESET}   ${item.agents} → ${item.method}${' '.repeat(width - path.length - item.agents.length - item.method.length - 7)}${CYAN}│${RESET}`;
+        const details = `  ${item.agents} → ${item.method}`;
+        return `${CYAN}│${RESET} ${path}\n${CYAN}│${RESET}${details}${' '.repeat(Math.max(0, width - visibleLength(details) - 1))}${CYAN}│${RESET}`;
     });
     const bottom = `${CYAN}└${'─'.repeat(width + 1)}─┘${RESET}`;
     return `${top}\n${lines.join('\n')}\n${bottom}`;
@@ -85,7 +92,10 @@ export function securityTable(items) {
 export function installComplete(items) {
     const width = 74;
     const header = `${CYAN}┌─ Installed ${items.length} skills ${'─'.repeat(width - 21)}─┐${RESET}`;
-    const lines = items.map(item => `${CYAN}│${RESET} ✓ ${item.skill}\n${CYAN}│${RESET}   ${item.path}\n${CYAN}│${RESET}   symlinked: ${item.agents}${' '.repeat(width - item.agents.length - item.path.length - 14)}${CYAN}│${RESET}`);
+    const lines = items.map(item => {
+        const summary = `  symlinked: ${item.agents}`;
+        return `${CYAN}│${RESET} ✓ ${item.skill}\n${CYAN}│${RESET}   ${item.path}\n${CYAN}│${RESET}${summary}${' '.repeat(Math.max(0, width - visibleLength(summary) - 1))}${CYAN}│${RESET}`;
+    });
     const footer = `${CYAN}├${'─'.repeat(width + 1)}┤${RESET}`;
     const bottom = `${CYAN}└${'─'.repeat(width + 1)}─┘${RESET}`;
     return `${header}\n${lines.join('\n')}\n${footer}\n${bottom}`;
@@ -97,7 +107,7 @@ export function promptBox(title, options, selected) {
         const prefix = i === selected ? `${CYAN}▸${RESET}` : ' ';
         const suffix = i === selected ? ` ${CYAN}(selected)${RESET}` : '';
         const line = `${prefix} ${opt}${suffix}`;
-        return `${CYAN}│${RESET} ${line}${' '.repeat(width - line.length - 2)}${CYAN}│${RESET}`;
+        return `${CYAN}│${RESET} ${line}${' '.repeat(Math.max(0, width - visibleLength(line) - 2))}${CYAN}│${RESET}`;
     });
     const bottom = `${CYAN}└${'─'.repeat(width + 1)}─┘${RESET}`;
     return `${top}\n${lines.join('\n')}\n${bottom}`;

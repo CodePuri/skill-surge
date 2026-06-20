@@ -4,6 +4,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import * as readline from 'node:readline';
 import { stdin, stdout } from 'node:process';
+import { VERSION } from './types.js';
 import { detectAgents, resolveAgentPath, auditProject, loadConfig, installSkillToAgents } from './install.js';
 import { ALL_SKILLS, isTrivialTask, rankSkillsForTask } from './search.js';
 import { T, divider, header, C } from './ui/terminal.js';
@@ -11,7 +12,6 @@ import { select, interactiveMultiSelect, confirmWithPrompt } from './ui/prompt.j
 import { logo, errorBanner, successBanner, sectionHeader, infoBox, installSummary, securityTable, installComplete } from './ui/banner.js';
 import { dashboardBox } from './ui/table.js';
 import { startSpinner, stopSpinner } from './ui/spinner.js';
-const VERSION = '2.2.1';
 const CYAN = C.brightCyan;
 const GREEN = C.brightGreen;
 const WHITE = C.white;
@@ -190,18 +190,28 @@ async function cmdInit() {
     console.log('');
     const agents = detectAgents();
     const installed = agents.filter(a => a.installed);
+    console.log(`${CYAN}◇${RESET}  Agent Detection`);
     if (installed.length === 0) {
-        console.log(`${CYAN}◇${RESET}  No agent environments detected.`);
-        console.log(`  skill-surge will install skills to global directories regardless.`);
+        console.log(`  No agent environments detected. Will use global directories.`);
     }
     else {
-        console.log(`${CYAN}◇${RESET}  Detected agents:`);
         for (const agent of installed) {
-            console.log(`    ${CYAN}▸${RESET} ${agent.name}  ${T.muted(agent.globalPath)}`);
+            console.log(`    ${CYAN}▸${RESET} ${agent.name.padEnd(16)} ${T.muted(agent.globalPath)}`);
         }
     }
     console.log('');
     const agentsToUse = installed.length > 0 ? installed : agents;
+    // Scope selection
+    t('  Installation scope:');
+    const scopeIdx = await select('', ['Global  (recommended)', 'Project  (./.agents/skills/)', 'Both global and project']);
+    const scopes = ['global', 'project', 'both'];
+    const scope = scopes[scopeIdx];
+    console.log('');
+    // Method selection
+    t('  Installation method:');
+    const methodIdx = await select('', ['Symlink  (recommended)', 'Copy']);
+    const method = methodIdx === 0 ? 'symlink' : 'copy';
+    console.log('');
     const essential = [
         'brainstorming', 'writing-plans', 'executing-plans',
         'systematic-debugging', 'tdd', 'node-api-design',
@@ -210,15 +220,23 @@ async function cmdInit() {
         'git-workflow', 'system-design', 'project-planning',
     ];
     const essentialSkills = ALL_SKILLS.filter(s => essential.includes(s.name));
-    console.log(`${CYAN}◇${RESET}  Installing ${essentialSkills.length} essential skills to ${agentsToUse.length} agent(s).`);
-    console.log(`  ${T.muted('Skills: ' + essentialSkills.map(s => s.name).join(', '))}`);
+    console.log(`${CYAN}◇${RESET}  15 essential skills selected:`);
+    console.log(`  ${T.muted(essentialSkills.map(s => s.name).join(', '))}`);
+    console.log('');
+    console.log(`  ${T.muted('Scope:')} ${scope}    ${T.muted('Method:')} ${method}    ${T.muted('Agents:')} ${agentsToUse.length}`);
+    console.log('');
+    const proceed = await confirmWithPrompt('Install 15 essential skills?');
+    if (!proceed) {
+        console.log('\n  Init cancelled.\n');
+        return 0;
+    }
     console.log('');
     startSpinner('Installing essential skills...');
     let installedCount = 0;
     for (const skill of essentialSkills) {
         await new Promise(resolve => setTimeout(resolve, 100));
         for (const agent of agentsToUse) {
-            const results = installSkillToAgents(skill.name, [agent], 'global', { installMode: 'symlink' });
+            const results = installSkillToAgents(skill.name, [agent], scope, { installMode: method });
             if (results.some(r => r.success))
                 installedCount++;
         }
@@ -342,34 +360,60 @@ async function cmdSuggest(args) {
         console.log(`    [${i + 1}] ${installed} ${skill.name.padEnd(20)} — ${skill.reason}`);
     }
     console.log('');
-    // Get user input for selection
-    const selectionInput = await new Promise((resolve) => {
-        const rl = readline.createInterface({ input: stdin, output: stdout });
-        rl.question('Install one? [1-3 / Enter to skip]: ', (answer) => {
-            rl.close();
-            resolve(answer.trim());
-        });
+    // Keyboard-driven selection — press 1,2,3 to install, Enter to skip
+    const selection = await new Promise((resolve) => {
+        readline.emitKeypressEvents(stdin);
+        const wasRaw = stdin.isRaw;
+        if (stdin.isTTY)
+            stdin.setRawMode(true);
+        stdout.write('Install one? [1-3 / Enter to skip]: ');
+        function cleanup() {
+            if (stdin.isTTY && stdin.isRaw)
+                stdin.setRawMode(false);
+            stdin.removeListener('keypress', handler);
+        }
+        function handler(str, key) {
+            if (!key) {
+                // EOF on pipe
+                cleanup();
+                resolve(null);
+                return;
+            }
+            if (key.name === 'return' || key.name === 'enter') {
+                cleanup();
+                stdout.write('\n');
+                resolve(null);
+            }
+            else if (str === '1') {
+                cleanup();
+                stdout.write('1\n');
+                resolve(0);
+            }
+            else if (str === '2') {
+                cleanup();
+                stdout.write('2\n');
+                resolve(1);
+            }
+            else if (str === '3') {
+                cleanup();
+                stdout.write('3\n');
+                resolve(2);
+            }
+        }
+        stdin.on('keypress', handler);
     });
-    // If user just pressed Enter, skip
-    if (selectionInput === '') {
+    if (selection === null) {
         console.log('');
         return 0;
     }
-    // Parse selection
-    const selection = parseInt(selectionInput, 10);
-    if (isNaN(selection) || selection < 1 || selection > 3) {
-        console.log('  Invalid selection. Skipping.');
-        return 0;
-    }
-    const selectedSkill = top3[selection - 1];
-    console.log(`  Installing ${selectedSkill.name}...`);
+    const selectedSkill = top3[selection];
+    console.log(`\n  Installing ${selectedSkill.name}...`);
     // Auto-install the selected skill
     const agentsToInstall = detectAgents();
     for (const agent of agentsToInstall) {
         installSkillToAgents(selectedSkill.name, [agent], 'global');
     }
-    console.log(`  ✓ Installed ${selectedSkill.name} to ${agentsToInstall.length} agent(s).`);
-    console.log('');
+    console.log(`  ✓ Installed ${selectedSkill.name} to ${agentsToInstall.length} agent(s).\n`);
     return 0;
 }
 async function cmdList() {
@@ -422,7 +466,7 @@ async function cmdList() {
         { label: 'Design / UX', internal: ['design'] },
         { label: 'QA / Testing', internal: ['qa'] },
         { label: 'Architecture', internal: ['architecture'] },
-        { label: 'All Skills (29 total)', internal: [] },
+        { label: `All Skills (${ALL_SKILLS.length} total)`, internal: [] },
     ];
     const categoryChoices = categoryMap.map(c => c.label);
     console.log('');

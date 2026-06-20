@@ -239,6 +239,7 @@ export function clearCache(): boolean {
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = path.resolve(__dirname, '..');
 const DEFAULT_CONFIG_PATH = path.join(__dirname, '..', 'config', 'sources.json');
 
 export function loadConfig(): Config {
@@ -343,9 +344,7 @@ export function auditProject(globalPaths: string[]): ScanResult {
 }
 
 function getOriginalSkillPath(skillName: string): string | null {
-  const home = os.homedir();
-  const skillSurgeRoot = path.join(home, 'Desktop', 'Code', 'auto-skills');
-  const originalDir = path.join(skillSurgeRoot, 'skills', 'original', skillName);
+  const originalDir = path.join(PACKAGE_ROOT, 'skills', 'original', skillName);
   const skillMd = path.join(originalDir, 'SKILL.md');
   if (fs.existsSync(skillMd)) return skillMd;
   return null;

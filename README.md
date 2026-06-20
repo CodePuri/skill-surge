@@ -18,7 +18,7 @@
 
 **skill-surge** is a plug-and-play CLI that installs structured skill files into your AI agents. No manual hunting. No copy-paste. One command and your agent gains domain expertise across every domain.
 
-It ships with **29 curated skills** (18 from the skills.sh ecosystem + 11 original) covering workflow, frontend, backend, database, design, security, DevOps, QA, architecture, and planning — and can install skills from any [skills.sh](https://skills.sh) repository.
+It ships with **37 curated skills** (26 from the skills.sh ecosystem + 11 original) covering workflow, frontend, backend, database, design, security, DevOps, QA, architecture, and planning — and can install skills from any [skills.sh](https://skills.sh) repository.
 
 ```
   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
@@ -84,7 +84,7 @@ What are you building?
     Design / UX
     QA / Testing
     Architecture
-    All Skills (29 total)
+    All Skills (37 total)
 ```
 
 ### Scan
@@ -92,11 +92,11 @@ What are you building?
 $ skill-surge scan
 
 ╔════════  SKILL-SURGE DASHBOARD  ═════════╗
-║  Version              2.2.2           ✓  ║
+║  Version              2.3.0           ✓  ║
 ║  Node                 v24.1.0         ✓  ║
 ║  Platform             darwin          ✓  ║
 ║  Skills Installed     82              ✓  ║
-║  Skills Available     29              ✓  ║
+║  Skills Available     37              ✓  ║
 ╚══════════════════════════════════════════╝
 
   ✓ All systems operational.
@@ -104,7 +104,7 @@ $ skill-surge scan
 
 ---
 
-## ██ 29 SKILLS
+## ██ 37 SKILLS
 
 Every skill ships with real, actionable content — not stubs.
 
@@ -128,7 +128,12 @@ Every skill ships with real, actionable content — not stubs.
 |---|-------|---------------|
 | 1 | `vercel-react-best-practices` | 69 rules: React, Next.js, performance |
 | 2 | `next-best-practices` | App Router, RSC, async APIs, metadata |
-| 3 | `react-patterns` | Hooks, TanStack Query, component patterns |
+| 3 | `next-cache-components` | Next.js 16 cache directives, PPR, tags |
+| 4 | `next-upgrade` | Next.js upgrades with codemods and migration guides |
+| 5 | `vercel-composition-patterns` | Scalable React component composition |
+| 6 | `vercel-react-native-skills` | React Native and Expo performance practices |
+| 7 | `vercel-react-view-transitions` | Route and shared-element animations with View Transitions |
+| 8 | `react-patterns` | Hooks, TanStack Query, component patterns |
 
 ### Backend / API
 | # | Skill | What It Covers |
@@ -148,7 +153,9 @@ Every skill ships with real, actionable content — not stubs.
 |---|-------|---------------|
 | 1 | `frontend-design` | Universal frontend design guidelines |
 | 2 | `ui-ux-pro-max` | 50+ styles, 161 palettes, 57 font pairings |
-| 3 | `accessibility-first` | WCAG 2.1 AA, semantic HTML, ARIA |
+| 3 | `terminal-ui` | Ink, Clack, keyboard input, terminal rendering |
+| 4 | `web-design-guidelines` | UI review against accessibility and UX guidelines |
+| 5 | `accessibility-first` | WCAG 2.1 AA, semantic HTML, ARIA |
 
 ### Security
 | # | Skill | What It Covers |
@@ -158,7 +165,8 @@ Every skill ships with real, actionable content — not stubs.
 ### DevOps / Deploy
 | # | Skill | What It Covers |
 |---|-------|---------------|
-| 1 | `deploy-to-vercel` | Deploy apps with preview URLs, aliases |
+| 1 | `vercel-cli-with-tokens` | Vercel CLI workflows with token auth |
+| 2 | `deploy-to-vercel` | Deploy apps with preview URLs, aliases |
 
 ### QA / Testing
 | # | Skill | What It Covers |
@@ -212,7 +220,7 @@ Every skill ships with real, actionable content — not stubs.
     ┌─────────────┐             ┌─────────────┐             ┌──────────────┐
     │  BUNDLED    │             │  SKILLS.SH  │             │    LOCAL     │
     │  skills/    │             │  ALL_SKILLS │             │ installed on │
-    │  11 skills  │             │  18 skills  │             │  agent paths │
+    │  11 skills  │             │  26 skills  │             │  agent paths │
     │  (original) │             │  (top-repo) │             │              │
     └──────┬──────┘             └──────┬──────┘             └──────┬───────┘
            │                          │                          │

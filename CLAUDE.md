@@ -26,7 +26,7 @@ src/
     table.ts     Table renderer
     banner.ts    ASCII art / splash screen
 tests/
-  smoke.test.ts  76 tests covering all modules
+  smoke.test.js  67 tests covering catalog, CLI, packaging, and installer flows
 skills/
   original/      11 bundled SKILL.md files (the product)
 ```
@@ -35,7 +35,7 @@ skills/
 
 | Command | Purpose |
 |---------|---------|
-| `skill-surge list` | Show all 29 skills grouped by category |
+| `skill-surge list` | Show all 37 skills grouped by category |
 | `skill-surge add` | Interactive skill installer |
 | `skill-surge suggest --task "..."` | Find relevant skills for a task |
 | `skill-surge scan` | Audit project and show dashboard |

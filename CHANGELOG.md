@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.3.0 (2026-06-20)
+- Add 8 lockfile-backed upstream skills to the catalog: `next-cache-components`, `next-upgrade`, `terminal-ui`, `vercel-cli-with-tokens`, `vercel-composition-patterns`, `vercel-react-native-skills`, `vercel-react-view-transitions`, `web-design-guidelines`
+- Refresh `skills-lock.json` hashes after explicit upstream review of source paths, descriptions, and repo licensing state
+- Fix bundled original skill installation so published packages resolve `skills/original/*/SKILL.md` relative to the installed tarball
+- Include bundled original skills in the npm package and strengthen `prepublishOnly` to run build, typecheck, and tests
+- Harden terminal box rendering against ANSI width overflows and isolate the smoke suite to temp home/cache state
+- Add CI coverage for Node.js 20, 22, and 24
+- Chore: catalog now ships 37 curated skills (26 top-repo + 11 original)
+
 ## 2.1.1 (2026-05-12)
 - Fix: "Docs: undefined" bug in splash screen (a() function returned undefined)
 - Fix: Interactive selector rewritten with raw stdin for reliable key capture
