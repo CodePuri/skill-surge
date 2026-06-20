@@ -12,6 +12,6 @@ Run only in an isolated worktree. Use the repository's configured Node runtime a
 8. For each eligible fix, create a branch and PR, run all checks, enable squash auto-merge, and wait for `merge-gate`.
 9. After merge, run the clean-main canary. Create an automatic revert PR if it fails.
 10. If package contents changed, create the patch release PR, tag the merged version, and wait for npm/GitHub release success.
-11. Validate and append one immutable `ReleaseRecord` to the cycle issue.
+11. Validate and append one immutable `ReleaseRecord` with `npm run automation:record-release -- /tmp/<cycle>-release.json`.
 
 Report the cycle ID, findings considered, PRs merged or blocked, checks, release version, ledger URL, and any rollback.

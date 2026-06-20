@@ -17,6 +17,7 @@
     "automation:secret-scan": "node scripts/automation/secret-scan.mjs",
     "automation:preflight": "scripts/automation/run-with-env.sh node scripts/automation/preflight.mjs",
     "automation:dry-run": "node scripts/automation/dry-run.mjs",
+    "automation:record-release": "node scripts/automation/record-release.mjs",
     "automation:substack-auth": "scripts/automation/run-with-env.sh node scripts/automation/substack-auth.mjs"
   },
   "files": [
