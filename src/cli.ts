@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import * as readline from 'node:readline';
 import { stdin, stdout } from 'node:process';
 import type { Agent, ScoredCandidate, ScanResult } from './types.js';
-import { detectAgents, detectInstalledAgents, resolveAgentPath, auditProject, loadConfig, loadCache, saveCache, userConfigPath, installSkillToAgents, installTopRepoSkills } from './install.js';
+import { detectAgents, detectInstalledAgents, resolveAgentPath, auditProject, loadConfig, loadCache, saveCache, userConfigPath, installSkillToAgents, installTopRepoSkills, refreshSkillCache } from './install.js';
 import { ALL_SKILLS, getSkillByName, isTrivialTask, rankSkillsForTask, runSkillsFind } from './search.js';
 import { T, box, divider, header, C } from './ui/terminal.js';
 import { select, interactiveMultiSelect, confirmWithPrompt } from './ui/prompt.js';
@@ -38,6 +38,7 @@ function printSplash() {
   console.log(`  ${CYAN}▸${RESET} skill-surge init       First-run setup`);
   console.log(`  ${CYAN}▸${RESET} skill-surge add        Interactive skill installation`);
   console.log(`  ${CYAN}▸${RESET} skill-surge scan       Audit project`);
+  console.log(`  ${CYAN}▸${RESET} skill-surge refresh    Refresh metadata cache`);
   console.log(`  ${CYAN}▸${RESET} skill-surge list       Show installed skills`);
   console.log(`  ${CYAN}▸${RESET} skill-surge suggest    Find skills for a task`);
   console.log(`  ${CYAN}▸${RESET} skill-surge hook       Agent trigger (JSON)`);
@@ -691,6 +692,27 @@ async function cmdConfig() {
   return 0;
 }
 
+async function cmdRefresh() {
+  const config = loadConfig();
+  const agents = detectAgents().filter(a => a.installed);
+  const agentPaths = agents.flatMap(agent => [agent.globalPath, agent.localPath]);
+  const result = refreshSkillCache(agentPaths);
+
+  console.log('');
+  console.log(sectionHeader('Refresh'));
+  console.log('');
+  console.log(`Cache path: ${result.cachePath}`);
+  console.log(`Local skills found: ${result.localSkills.length > 0 ? 'yes' : 'no'} (${result.localSkills.length})`);
+  console.log(`Configured git sources inspected: ${config.customSources.length > 0 ? 'yes' : 'no'} (${config.customSources.length})`);
+  if (config.customSources.length > 0) {
+    console.log(`Sources: ${config.customSources.join(', ')}`);
+  }
+  const changed = [...new Set([...result.added, ...result.updated])];
+  console.log(`Changed skills: ${changed.length > 0 ? changed.slice(0, 20).join(', ') + (changed.length > 20 ? ' ...' : '') : 'none'}`);
+  console.log('');
+  return 0;
+}
+
 function printHelp() {
   printSplash();
 }
@@ -698,6 +720,7 @@ function printHelp() {
 const COMMANDS: Record<string, (args: string[]) => Promise<number>> = {
   init: cmdInit,
   add: cmdAdd,
+  refresh: cmdRefresh,
   scan: cmdScan,
   suggest: cmdSuggest,
   list: cmdList,

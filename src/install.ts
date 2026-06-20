@@ -458,6 +458,44 @@ export function scanLocalSkills(agentPaths: string[]): { name: string; path: str
   return results;
 }
 
+export function refreshSkillCache(agentPaths: string[]): {
+  cachePath: string;
+  localSkills: { name: string; path: string; agentPath: string }[];
+  added: string[];
+  updated: string[];
+  cache: CacheData;
+} {
+  const localSkills = scanLocalSkills(agentPaths);
+  const cache = loadCache();
+  const added = new Set<string>();
+  const updated = new Set<string>();
+
+  for (const skill of localSkills) {
+    const current = cache.skills[skill.name];
+    if (!current) {
+      cache.skills[skill.name] = { installedAt: new Date().toISOString(), agents: [] };
+      added.add(skill.name);
+    }
+
+    const agentSlug = path.basename(path.dirname(skill.agentPath));
+    if (!cache.skills[skill.name].agents.includes(agentSlug)) {
+      cache.skills[skill.name].agents.push(agentSlug);
+      updated.add(skill.name);
+    }
+  }
+
+  cache.generatedAt = new Date().toISOString();
+  saveCache(cache);
+
+  return {
+    cachePath: cachePath(),
+    localSkills,
+    added: [...added],
+    updated: [...updated],
+    cache,
+  };
+}
+
 export function getSkillContent(skillMdPath: string): string {
   try {
     return fs.readFileSync(skillMdPath, 'utf8');
