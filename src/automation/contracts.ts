@@ -95,6 +95,7 @@ export interface PublicationBundle extends ArtifactIdentity {
 
 export interface PublicationResult extends ArtifactIdentity {
   platform: Platform;
+  format?: PublicationBundle['format'];
   status: 'published' | 'skipped' | 'policy-blocked' | 'failed';
   externalId?: string;
   url?: string;

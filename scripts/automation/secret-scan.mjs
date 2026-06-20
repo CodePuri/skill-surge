@@ -4,7 +4,7 @@ import path from 'node:path';
 
 const blocked = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
-  /(?:api[_-]?key|client[_-]?secret|refresh[_-]?token)[ \t]*[=:][ \t]*["']?(?!process\.env\.)[A-Za-z0-9._~-]{16,}/i,
+  /(?:api[_-]?key|client[_-]?secret|refresh[_-]?token)[ \t]*[=:][ \t]*["']?(?!(?:process\.env\.|credentials\.|required[ \t]*\())[A-Za-z0-9._~-]{16,}/i,
   /gh[opsu]_[A-Za-z0-9]{30,}/,
 ];
 const ignored = new Set([

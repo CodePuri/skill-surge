@@ -14,7 +14,10 @@
     "test:automation": "node --test tests/automation/*.test.ts",
     "automation:canary": "node scripts/automation/release.mjs canary --execute",
     "automation:canary:dry-run": "node scripts/automation/release.mjs canary --dry-run",
-    "automation:secret-scan": "node scripts/automation/secret-scan.mjs"
+    "automation:secret-scan": "node scripts/automation/secret-scan.mjs",
+    "automation:preflight": "scripts/automation/run-with-env.sh node scripts/automation/preflight.mjs",
+    "automation:dry-run": "node scripts/automation/dry-run.mjs",
+    "automation:substack-auth": "scripts/automation/run-with-env.sh node scripts/automation/substack-auth.mjs"
   },
   "files": [
     "dist",
@@ -45,6 +48,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "playwright": "^1.61.0",
     "typescript": "^5.8.0"
   },
   "license": "MIT"

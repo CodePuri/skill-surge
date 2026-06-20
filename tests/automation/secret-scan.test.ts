@@ -24,6 +24,8 @@ describe('secret scanner', () => {
       'SUBSTACK_PUBLICATION_URL=',
       'SUBSTACK_STORAGE_STATE=~/.config/skill-surge/state.json',
       'const apiKey = process.env.MYAPP_API_KEY;',
+      'const options = { clientSecret: credentials.clientSecret };',
+      "const refreshToken = required('REDDIT_REFRESH_TOKEN');",
     ].join('\n'));
     try {
       const result = spawnSync('node', [SCRIPT], { cwd: f.dir, encoding: 'utf8' });

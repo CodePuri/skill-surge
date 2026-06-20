@@ -17,6 +17,14 @@ import { startSpinner, stopSpinner, stopSpinnerWithSuccess, stopSpinnerWithError
 import { refreshSkills } from './automation/refresh.js';
 import { collectDiagnostics } from './automation/diagnostics.js';
 import { validateReleaseRecord } from './automation/github-ledger.js';
+import { GithubLedger } from './automation/github-ledger.js';
+import { isKillSwitchActive, loadAutomationConfig } from './automation/policy.js';
+import { publishBundle, validatePublicationBundle } from './automation/publication.js';
+import { collectGrowthSnapshot } from './automation/metrics.js';
+import { collectXMetrics, publishToX } from './automation/platforms/x.js';
+import { collectRedditMetrics, publishToReddit } from './automation/platforms/reddit.js';
+import { collectSubstackMetrics, publishToSubstack } from './automation/platforms/substack.js';
+import type { Platform, PublicationResult } from './automation/contracts.js';
 
 const VERSION = '2.2.4';
 const CYAN = C.brightCyan;
@@ -765,8 +773,97 @@ async function cmdAutomation(args: string[]) {
     console.log(`Release record ${release.cycleId} is valid.`);
     return 0;
   }
+  if (action === 'publish') {
+    const file = rest.find(arg => !arg.startsWith('--'));
+    if (!file) {
+      console.error('Usage: skill-surge automation publish <bundle> [--dry-run]');
+      return 1;
+    }
+    const dryRun = rest.includes('--dry-run');
+    const bundle = validatePublicationBundle(JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')));
+    const config = loadAutomationConfig();
+    if (!dryRun && isKillSwitchActive('publish')) {
+      console.error('Publication paused by kill switch.');
+      return 3;
+    }
+    const enabledPlatforms = (['substack', 'x', 'reddit'] as Platform[])
+      .filter(platform => config.publication.enabled && config.publication.platforms[platform]);
+    const repo = process.env.GITHUB_REPOSITORY || 'CodePuri/skill-surge';
+    const ledger = dryRun ? undefined : new GithubLedger({ repo });
+    const issue = ledger ? await ledger.findCycleIssue(bundle.cycleId) : undefined;
+    if (ledger && issue === undefined) throw new Error(`No GitHub cycle issue found for ${bundle.cycleId}`);
+    const existing = ledger && issue !== undefined
+      ? await ledger.readTypedComments(issue, 'publication-result') as PublicationResult[]
+      : [];
+    const required = (name: string) => {
+      const value = process.env[name];
+      if (!value) throw new Error(`Missing required environment variable ${name}`);
+      return value;
+    };
+    const adapters = dryRun ? {} : {
+      x: (content: any) => publishToX(content, {
+        clientId: required('X_CLIENT_ID'), clientSecret: required('X_CLIENT_SECRET'),
+        refreshToken: required('X_REFRESH_TOKEN'), userId: required('X_USER_ID'),
+      }),
+      reddit: (content: any) => publishToReddit(content, config.publication.redditAllowlist, {
+        clientId: required('REDDIT_CLIENT_ID'), clientSecret: required('REDDIT_CLIENT_SECRET'),
+        refreshToken: required('REDDIT_REFRESH_TOKEN'), userAgent: required('REDDIT_USER_AGENT'),
+      }),
+      substack: (content: any) => publishToSubstack(content, {
+        publicationUrl: required('SUBSTACK_PUBLICATION_URL'),
+        storageStatePath: path.resolve(required('SUBSTACK_STORAGE_STATE').replace(/^~(?=\/)/, os.homedir())),
+      }),
+    };
+    const results = await publishBundle({
+      bundle, enabledPlatforms, existingResults: existing,
+      maxRetries: config.publication.maxRetries, retryBackoffMs: config.publication.retryBackoffMs,
+      dryRun, adapters,
+      recordResult: async result => {
+        if (ledger && issue !== undefined) await ledger.appendTypedComment(issue, 'publication-result', result);
+      },
+    });
+    console.log(JSON.stringify(results, null, 2));
+    return results.some(result => result.status === 'failed') ? 2 : 0;
+  }
+  if (action === 'metrics') {
+    const cycleId = rest[0];
+    if (!cycleId) {
+      console.error('Usage: skill-surge automation metrics <cycle-id> --json');
+      return 1;
+    }
+    if (isKillSwitchActive('publish')) {
+      console.error('Publication metrics paused by kill switch.');
+      return 3;
+    }
+    const ledger = new GithubLedger({ repo: process.env.GITHUB_REPOSITORY || 'CodePuri/skill-surge' });
+    const issue = await ledger.findCycleIssue(cycleId);
+    if (issue === undefined) throw new Error(`No GitHub cycle issue found for ${cycleId}`);
+    const results = await ledger.readTypedComments(issue, 'publication-result') as PublicationResult[];
+    const required = (name: string) => process.env[name] || '';
+    const xCredentials = {
+      clientId: required('X_CLIENT_ID'), clientSecret: required('X_CLIENT_SECRET'),
+      refreshToken: required('X_REFRESH_TOKEN'), userId: required('X_USER_ID'),
+    };
+    const redditUserAgent = required('REDDIT_USER_AGENT');
+    const substackConfig = {
+      publicationUrl: required('SUBSTACK_PUBLICATION_URL'),
+      storageStatePath: path.resolve(required('SUBSTACK_STORAGE_STATE').replace(/^~(?=\/)/, os.homedir())),
+    };
+    const collectors: any = {};
+    if (xCredentials.clientId && xCredentials.refreshToken) collectors.x = (result: PublicationResult) => collectXMetrics(result, xCredentials);
+    if (redditUserAgent) collectors.reddit = (result: PublicationResult) => collectRedditMetrics(result, { userAgent: redditUserAgent });
+    if (substackConfig.publicationUrl && substackConfig.storageStatePath) collectors.substack = (result: PublicationResult) => collectSubstackMetrics(result, substackConfig);
+    const snapshot = await collectGrowthSnapshot({
+      cycleId, sourceSha: results[0]?.sourceSha || gitSourceSha(),
+      format: results.find(result => result.format)?.format || 'tutorial', publicationResults: results,
+      platformCollectors: collectors, repo: process.env.GITHUB_REPOSITORY || 'CodePuri/skill-surge', packageName: 'skill-surge',
+    });
+    await ledger.appendTypedComment(issue, 'growth-snapshot', snapshot);
+    console.log(JSON.stringify(snapshot, null, 2));
+    return 0;
+  }
   if (action !== 'diagnose') {
-    console.error('Usage: skill-surge automation diagnose --json | skill-surge automation validate-release <file>');
+    console.error('Usage: skill-surge automation diagnose --json | validate-release <file> | publish <bundle> [--dry-run] | metrics <cycle-id> --json');
     return 1;
   }
   const refreshReport = await createRefreshReport(false);

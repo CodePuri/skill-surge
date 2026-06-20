@@ -122,4 +122,14 @@ export class GithubLedger {
     if (result.status !== 0) throw new Error(`Unable to append cycle record: ${result.stderr.trim()}`);
     return true;
   }
+
+  async readTypedComments(issue: number, kind: LedgerKind): Promise<LedgerArtifact[]> {
+    const viewed = await this.runGh(['issue', 'view', String(issue), '--repo', this.repo, '--json', 'comments']);
+    if (viewed.status !== 0) throw new Error(`Unable to read cycle issue: ${viewed.stderr.trim()}`);
+    const payload = JSON.parse(viewed.stdout || '{"comments":[]}') as { comments?: Array<{ body: string }> };
+    return (payload.comments ?? []).flatMap(comment => {
+      const record = decodeLedgerComment(comment.body, kind);
+      return record ? [record] : [];
+    });
+  }
 }

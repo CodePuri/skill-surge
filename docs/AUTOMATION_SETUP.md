@@ -27,8 +27,11 @@ REDDIT_CLIENT_SECRET=
 REDDIT_REFRESH_TOKEN=
 REDDIT_USER_AGENT=macos:skill-surge-automation:1.0.0:by_CodePuri
 SUBSTACK_PUBLICATION_URL=
-SUBSTACK_STORAGE_STATE=~/.config/skill-surge/substack.storage-state.json
+SUBSTACK_STORAGE_STATE=~/.config/skill-surge/substack.storage-state.enc.json
+SUBSTACK_STATE_KEY=
 ```
+
+Generate the encryption key with `openssl rand -base64 32` and store only the output in `SUBSTACK_STATE_KEY`.
 
 Do not place this file or its values in the repository, GitHub Issues, screenshots, or command output.
 
