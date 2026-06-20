@@ -14,6 +14,8 @@ import { select, interactiveMultiSelect, confirmWithPrompt } from './ui/prompt.j
 import { logo, errorBanner, successBanner, sectionHeader, infoBox, progressBox, installSummary, securityTable, installComplete, promptBox, divider as bannerDivider } from './ui/banner.js';
 import { skillsTable, candidateTable, installedTable, summaryLine, dashboardBox } from './ui/table.js';
 import { startSpinner, stopSpinner, stopSpinnerWithSuccess, stopSpinnerWithError } from './ui/spinner.js';
+import { refreshSkills } from './automation/refresh.js';
+import { collectDiagnostics } from './automation/diagnostics.js';
 
 const VERSION = '2.2.4';
 const CYAN = C.brightCyan;
@@ -41,6 +43,8 @@ function printSplash() {
   console.log(`  ${CYAN}▸${RESET} skill-surge list       Show installed skills`);
   console.log(`  ${CYAN}▸${RESET} skill-surge suggest    Find skills for a task`);
   console.log(`  ${CYAN}▸${RESET} skill-surge hook       Agent trigger (JSON)`);
+  console.log(`  ${CYAN}▸${RESET} skill-surge refresh    Refresh trusted skill metadata`);
+  console.log(`  ${CYAN}▸${RESET} skill-surge automation Automation diagnostics and publishing`);
   console.log('');
   console.log('  Docs: ' + a('https://github.com/CodePuri/skill-surge'));
   console.log('');
@@ -691,6 +695,85 @@ async function cmdConfig() {
   return 0;
 }
 
+function gitSourceSha(): string {
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', shell: false });
+  return result.status === 0 ? result.stdout.trim() : 'unknown';
+}
+
+function refreshCachePath(): string {
+  return process.env.SKILL_SURGE_REFRESH_CACHE
+    || path.join(os.homedir(), '.cache', 'skill-surge', 'refresh-index.json');
+}
+
+function refreshLocalRoots(): string[] {
+  return [
+    path.resolve('skills/original'),
+    path.join(os.homedir(), '.agents', 'skills'),
+    path.join(os.homedir(), '.codex', 'skills'),
+    path.join(os.homedir(), '.claude', 'skills'),
+  ];
+}
+
+function trustedRemoteRepos(): string[] {
+  const trusted = new Set(loadConfig().trustedOwners.map(owner => owner.toLowerCase()));
+  return [...new Set(ALL_SKILLS.flatMap(skill => skill.repo ? [skill.repo] : []))]
+    .filter(repo => trusted.has(repo.split('/')[0].toLowerCase()));
+}
+
+async function createRefreshReport(network: boolean) {
+  return refreshSkills({
+    network,
+    cachePath: refreshCachePath(),
+    localRoots: refreshLocalRoots(),
+    remoteRepos: trustedRemoteRepos(),
+    sourceSha: gitSourceSha(),
+  });
+}
+
+async function cmdRefresh(args: string[]) {
+  const report = await createRefreshReport(args.includes('--network'));
+  if (args.includes('--json')) console.log(JSON.stringify(report, null, 2));
+  else {
+    console.log(`Refresh ${report.cycleId}: ${report.localSkills.length} local skills`);
+    console.log(`Added ${report.added.length}, changed ${report.changed.length}, removed ${report.removed.length}`);
+    console.log(`Cache: ${report.cachePath}`);
+  }
+  return report.remoteSources.some(source => !source.inspected) ? 2 : 0;
+}
+
+function readGitHubBugIssues() {
+  const result = spawnSync('gh', ['issue', 'list', '--state', 'open', '--limit', '100', '--json', 'number,title,body,labels'], {
+    encoding: 'utf8', timeout: 30_000, shell: false,
+  });
+  if (result.status !== 0) return [];
+  try {
+    const issues = JSON.parse(result.stdout) as Array<{ number: number; title: string; body: string; labels: Array<{ name: string }> }>;
+    return issues.map(issue => ({ ...issue, labels: issue.labels.map(label => label.name) }));
+  } catch { return []; }
+}
+
+async function cmdAutomation(args: string[]) {
+  const [action, ...rest] = args;
+  if (action !== 'diagnose') {
+    console.error('Usage: skill-surge automation diagnose --json');
+    return 1;
+  }
+  const refreshReport = await createRefreshReport(false);
+  const findings = await collectDiagnostics({
+    refreshReport,
+    commands: [
+      { name: 'build', command: 'npm run build' },
+      { name: 'test', command: `SKILL_SURGE_CACHE=${JSON.stringify(path.join(os.tmpdir(), 'skill-surge-diagnostics-cache.json'))} npm test` },
+      { name: 'audit', command: 'npm audit --omit=dev --audit-level=high' },
+    ],
+    githubIssues: readGitHubBugIssues(),
+    modelFindings: [],
+  });
+  if (rest.includes('--json')) console.log(JSON.stringify({ refreshReport, findings }, null, 2));
+  else console.log(`Diagnostics: ${findings.length} finding(s), ${findings.filter(finding => finding.eligible).length} eligible`);
+  return findings.some(finding => finding.source !== 'catalog' && finding.eligible) ? 2 : 0;
+}
+
 function printHelp() {
   printSplash();
 }
@@ -703,6 +786,8 @@ const COMMANDS: Record<string, (args: string[]) => Promise<number>> = {
   list: cmdList,
   hook: cmdHook,
   config: cmdConfig,
+  refresh: cmdRefresh,
+  automation: cmdAutomation,
 };
 
 (async () => {

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const CLI = '/Users/totem/Desktop/Code/auto-skills/dist/cli.js';
+const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist/cli.js');
 
 function cli(args: string[], input?: string): { stdout: string; stderr: string; status: number } {
   const r = spawnSync('node', [CLI, ...args], {
@@ -303,6 +303,8 @@ describe('CLI: version & help', () => {
     assert.ok(r.stdout.includes('list'));
     assert.ok(r.stdout.includes('hook'));
     assert.ok(r.stdout.includes('scan'));
+    assert.ok(r.stdout.includes('refresh'));
+    assert.ok(r.stdout.includes('automation'));
   });
 
   it('unknown command exits with code 1', () => {
@@ -315,6 +317,32 @@ describe('CLI: version & help', () => {
     const r = cli(['help']);
     assert.strictEqual(r.status, 0);
     assert.ok(r.stdout.includes('init'));
+  });
+});
+
+describe('CLI: refresh', () => {
+  it('refresh --json emits a versioned report', () => {
+    const cachePath = path.join(path.dirname(fileURLToPath(import.meta.url)), '.refresh-test-cache.json');
+    const result = spawnSync('node', [CLI, 'refresh', '--json'], {
+      encoding: 'utf8',
+      timeout: 30_000,
+      env: { ...process.env, SKILL_SURGE_REFRESH_CACHE: cachePath },
+    });
+    try {
+      assert.strictEqual(result.status, 0, result.stderr);
+      const payload = JSON.parse(result.stdout);
+      assert.strictEqual(payload.schemaVersion, 1);
+      assert.ok(payload.cycleId);
+      assert.strictEqual(payload.network, false);
+    } finally {
+      try { fs.unlinkSync(cachePath); } catch {}
+    }
+  });
+
+  it('automation requires a supported action', () => {
+    const r = cli(['automation']);
+    assert.strictEqual(r.status, 1);
+    assert.ok(r.stderr.includes('automation diagnose'));
   });
 });
 
