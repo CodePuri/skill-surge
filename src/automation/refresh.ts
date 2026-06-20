@@ -19,7 +19,7 @@ export interface RemoteInspection {
 export interface RefreshOptions {
   network: boolean;
   cachePath: string;
-  localRoots: string[];
+  localRoots: Array<string | { path: string; source: string }>;
   remoteRepos: string[];
   sourceSha: string;
   now?: Date;
@@ -31,7 +31,10 @@ function parseSkillName(content: string, fallback: string): string {
   const end = content.indexOf('\n---', 3);
   if (end < 0) return fallback;
   const match = content.slice(3, end).match(/^name:\s*(.+)$/m);
-  return match?.[1]?.trim() || fallback;
+  const value = match?.[1]?.trim();
+  if (!value) return fallback;
+  const quoted = value.match(/^(["'])(.*)\1$/);
+  return quoted ? quoted[2] : value;
 }
 
 function findSkillFiles(root: string): string[] {
@@ -112,7 +115,9 @@ export async function inspectGitSource(repo: string): Promise<RemoteInspection> 
 export async function refreshSkills(options: RefreshOptions): Promise<RefreshReport> {
   const now = options.now ?? new Date();
   const previous = readCache(options.cachePath);
-  const localSkills = options.localRoots.flatMap(root => scanSkills(root));
+  const localSkills = options.localRoots.flatMap(root => typeof root === 'string'
+    ? scanSkills(root)
+    : scanSkills(root.path, root.source));
   const remoteSources: RefreshReport['remoteSources'] = [];
   const remoteSkills: SkillMetadata[] = [];
   const inspect = options.inspectRemote ?? inspectGitSource;

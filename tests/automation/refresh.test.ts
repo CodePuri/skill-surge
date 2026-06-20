@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { refreshSkills } from '../../dist/automation/refresh.js';
+import { refreshSkills, scanSkills } from '../../dist/automation/refresh.js';
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-surge-refresh-'));
@@ -89,6 +89,28 @@ describe('refreshSkills', () => {
         inspected: false,
         error: 'network unavailable',
       }]);
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  });
+
+  it('uses an explicit stable source label instead of a worktree path', async () => {
+    const f = fixture();
+    try {
+      const report = await refreshSkills({
+        network: false,
+        cachePath: f.cachePath,
+        localRoots: [{ path: f.skills, source: 'repo:skills/original' }],
+        remoteRepos: [],
+        sourceSha: 'abc123',
+      });
+      assert.equal(report.localSkills[0].source, 'repo:skills/original');
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  });
+
+  it('normalizes quoted YAML skill names', () => {
+    const f = fixture();
+    try {
+      fs.writeFileSync(path.join(f.skill, 'SKILL.md'), '---\nname: "quoted-skill"\ndescription: Example\n---\n');
+      assert.equal(scanSkills(f.skills)[0].name, 'quoted-skill');
     } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
   });
 });

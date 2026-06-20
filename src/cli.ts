@@ -714,12 +714,12 @@ function refreshCachePath(): string {
     || path.join(os.homedir(), '.cache', 'skill-surge', 'refresh-index.json');
 }
 
-function refreshLocalRoots(): string[] {
+function refreshLocalRoots(): Array<{ path: string; source: string }> {
   return [
-    path.resolve('skills/original'),
-    path.join(os.homedir(), '.agents', 'skills'),
-    path.join(os.homedir(), '.codex', 'skills'),
-    path.join(os.homedir(), '.claude', 'skills'),
+    { path: path.resolve('skills/original'), source: 'repo:skills/original' },
+    { path: path.join(os.homedir(), '.agents', 'skills'), source: '~/.agents/skills' },
+    { path: path.join(os.homedir(), '.codex', 'skills'), source: '~/.codex/skills' },
+    { path: path.join(os.homedir(), '.claude', 'skills'), source: '~/.claude/skills' },
   ];
 }
 
